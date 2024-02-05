@@ -4,24 +4,20 @@
     Therefore, a model manager is needed to list/invoke/validate models.
 """
 
-from core.model_runtime.entities.message_entities import PromptMessage
-from core.model_runtime.entities.llm_entities import LLMResult
-from core.model_runtime.entities.model_entities import ModelType
-from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel, ModelPropertyKey
-from core.model_runtime.errors.invoke import InvokeRateLimitError, InvokeBadRequestError, \
-    InvokeConnectionError, InvokeAuthorizationError, InvokeServerUnavailableError
-from core.model_runtime.utils.encoders import jsonable_encoder
-from core.model_manager import ModelManager
-
-from core.tools.model.errors import InvokeModelError
-
-from extensions.ext_database import db
-
-from models.tools import ToolModelInvoke
-
-from typing import List, cast
 import json
-import logging
+from typing import List, cast
+
+from core.model_manager import ModelManager
+from core.model_runtime.entities.llm_entities import LLMResult
+from core.model_runtime.entities.message_entities import PromptMessage
+from core.model_runtime.entities.model_entities import ModelType
+from core.model_runtime.errors.invoke import (InvokeAuthorizationError, InvokeBadRequestError, InvokeConnectionError,
+                                              InvokeRateLimitError, InvokeServerUnavailableError)
+from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel, ModelPropertyKey
+from core.model_runtime.utils.encoders import jsonable_encoder
+from core.tools.model.errors import InvokeModelError
+from extensions.ext_database import db
+from models.tools import ToolModelInvoke
 
 
 class ToolModelManager:
@@ -112,7 +108,7 @@ class ToolModelManager:
 
         # get prompt tokens
         prompt_tokens = llm_model.get_num_tokens(model_instance.model, model_credentials, prompt_messages)
-        logging.info(f"\n\ntool_model_manager prompt: {json.dumps(prompt_messages, ensure_ascii=False)}\n\n")
+
         model_parameters = {
             'temperature': 0.8,
             'top_p': 0.8,
@@ -163,7 +159,6 @@ class ToolModelManager:
 
         # update tool model invoke
         tool_model_invoke.model_response = response.message.content
-        logging.info(f"\n\ntool_model_manager result: {json.dumps(tool_model_invoke.model_response, ensure_ascii=False)}\n\n")
         if response.usage:
             tool_model_invoke.answer_tokens = response.usage.completion_tokens
             tool_model_invoke.answer_unit_price = response.usage.completion_unit_price

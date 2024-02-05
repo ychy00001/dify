@@ -10,9 +10,9 @@ import logging
 class CwText2ImageTool(BuiltinTool):
     def _invoke(self,
                 user_id: str,
-               tool_paramters: Dict[str, Any],
+               tool_parameters: Dict[str, Any],
         ) -> Union[ToolInvokeMessage, List[ToolInvokeMessage]]:
-        logging.info("cw request parameters: %s", tool_paramters)
+        logging.info("cw request parameters: %s", tool_parameters)
 
         STYLE_LIST_MAP = {
                 "muou_realistic": "muou_realistic",
@@ -29,17 +29,17 @@ class CwText2ImageTool(BuiltinTool):
         """
             invoke tools
         """
-        keyword = tool_paramters['keyword']
+        keyword = tool_parameters['keyword']
         batch_size = 1
         map_img_style = "动漫(Anime)"
         size = "square"
-        if "batch_size" in tool_paramters:
-            batch_size = tool_paramters['batch_size'] if tool_paramters['batch_size'] > 1 else 1
-        if "img_style" in tool_paramters:
-            map_img_style = tool_paramters['img_style'] if tool_paramters['img_style'] in STYLE_LIST else STYLE_LIST[0]
+        if "batch_size" in tool_parameters:
+            batch_size = tool_parameters['batch_size'] if tool_parameters['batch_size'] > 1 else 1
+        if "img_style" in tool_parameters:
+            map_img_style = tool_parameters['img_style'] if tool_parameters['img_style'] in STYLE_LIST else STYLE_LIST[0]
             img_style = STYLE_LIST_MAP[map_img_style]
-        if "size" in tool_paramters:
-            size = tool_paramters['size'] if tool_paramters['size'] in SIZE_LIST else SIZE_LIST[0]
+        if "size" in tool_parameters:
+            size = tool_parameters['size'] if tool_parameters['size'] in SIZE_LIST else SIZE_LIST[0]
         img_with = 1024
         img_height = 1024
 

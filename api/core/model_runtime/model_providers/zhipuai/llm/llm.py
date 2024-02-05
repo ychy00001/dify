@@ -2,16 +2,19 @@ import json
 from typing import Any, Dict, Generator, List, Optional, Union
 
 from core.model_runtime.entities.llm_entities import LLMResult, LLMResultChunk, LLMResultChunkDelta
-from core.model_runtime.entities.message_entities import (AssistantPromptMessage, PromptMessage, PromptMessageRole,
-                                                          PromptMessageTool, SystemPromptMessage, UserPromptMessage, ToolPromptMessage,
-                                                          TextPromptMessageContent, ImagePromptMessageContent, PromptMessageContentType)
+from core.model_runtime.entities.message_entities import (AssistantPromptMessage, ImagePromptMessageContent,
+                                                          PromptMessage, PromptMessageContentType, PromptMessageRole,
+                                                          PromptMessageTool, SystemPromptMessage,
+                                                          TextPromptMessageContent, ToolPromptMessage,
+                                                          UserPromptMessage)
 from core.model_runtime.errors.validate import CredentialsValidateFailedError
-from core.model_runtime.utils import helper
 from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel
 from core.model_runtime.model_providers.zhipuai._common import _CommonZhipuaiAI
 from core.model_runtime.model_providers.zhipuai.zhipuai_sdk._client import ZhipuAI
-from core.model_runtime.model_providers.zhipuai.zhipuai_sdk.types.chat.chat_completion_chunk import ChatCompletionChunk
 from core.model_runtime.model_providers.zhipuai.zhipuai_sdk.types.chat.chat_completion import Completion
+from core.model_runtime.model_providers.zhipuai.zhipuai_sdk.types.chat.chat_completion_chunk import ChatCompletionChunk
+from core.model_runtime.utils import helper
+
 
 class ZhipuAILargeLanguageModel(_CommonZhipuaiAI, LargeLanguageModel):
 
@@ -194,6 +197,27 @@ class ZhipuAILargeLanguageModel(_CommonZhipuaiAI, LargeLanguageModel):
                             'content': prompt_message.content,
                             'tool_call_id': prompt_message.tool_call_id
                         })
+                    elif isinstance(prompt_message, AssistantPromptMessage):
+                        if prompt_message.tool_calls:
+                            params['messages'].append({
+                                'role': 'assistant',
+                                'content': prompt_message.content,
+                                'tool_calls': [
+                                    {
+                                        'id': tool_call.id,
+                                        'type': tool_call.type,
+                                        'function': {
+                                            'name': tool_call.function.name,
+                                            'arguments': tool_call.function.arguments
+                                        }
+                                    } for tool_call in prompt_message.tool_calls
+                                ]
+                            })
+                        else:
+                            params['messages'].append({
+                                'role': 'assistant',
+                                'content': prompt_message.content
+                            })
                     else:
                         params['messages'].append({
                             'role': prompt_message.role.value,

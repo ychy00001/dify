@@ -1,8 +1,10 @@
-from core.tools.entities.user_entities import UserToolProvider
 from typing import List
+
+from core.tools.entities.user_entities import UserToolProvider
 
 position = {
     'google': 1,
+    'bing': 2,
     'wikipedia': 2,
     'dalle': 3,
     'webscraper': 4,
@@ -13,7 +15,10 @@ position = {
     'stablediffusion': 9,
     'vectorizer': 10,
     'youtube': 11,
+    'github': 12,
+    'gaode': 13
 }
+
 
 class BuiltinToolProviderSort:
     @staticmethod

@@ -14,7 +14,7 @@ class CwProvider(BuiltinToolProviderController):
                 }
             ).invoke(
                 user_id='',
-                tool_paramters={
+                tool_parameters={
                     "keyword": "cat",
                     "batch_size": 1,
                     "img_style": "muou_realistic",

@@ -88,13 +88,13 @@ class BaiduAPI:
 class BaiduSearchTool(BuiltinTool):
     def _invoke(self, 
                 user_id: str,
-               tool_paramters: Dict[str, Any], 
+               tool_parameters: Dict[str, Any],
         ) -> Union[ToolInvokeMessage, List[ToolInvokeMessage]]:
         """
             invoke tools
         """
-        query = tool_paramters['query']
-        result_type = tool_paramters['result_type']
+        query = tool_parameters['query']
+        result_type = tool_parameters['result_type']
 
         result = BaiduAPI().run(query, result_type=result_type)
         if result_type == 'text':
