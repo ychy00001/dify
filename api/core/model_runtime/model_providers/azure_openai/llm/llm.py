@@ -126,6 +126,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
         if user:
             extra_model_kwargs['user'] = user
 
+        from core.model_runtime.model_providers.logtools import log2file
+        log2file(__file__ + "_generate", prompt_messages[0].content)
+
+        logger.info("\n\nAzureAI input:\n {}\n".format(prompt_messages[0].content))
         # text completion model
         response = client.completions.create(
             prompt=prompt_messages[0].content,
@@ -143,7 +147,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
     def _handle_generate_response(self, model: str, credentials: dict, response: Completion,
                                   prompt_messages: list[PromptMessage]) -> LLMResult:
         assistant_text = response.choices[0].text
+        from core.model_runtime.model_providers.logtools import log2file
+        log2file(__file__ + "_handle_generate_response", assistant_text)
 
+        logger.info("\n\nAzureAI output:\n {}\n".format(assistant_text))
         # transform assistant message to prompt message
         assistant_prompt_message = AssistantPromptMessage(
             content=assistant_text
@@ -204,6 +211,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
                     prompt_tokens = self._num_tokens_from_string(credentials, prompt_messages[0].content)
                     completion_tokens = self._num_tokens_from_string(credentials, full_text)
 
+                from core.model_runtime.model_providers.logtools import log2file
+                log2file(__file__ + "_handle_generate_stream_response", full_text)
+
+                logger.info("\n\nAzureAI stream output:\n {}\n".format(full_text))
                 # transform usage
                 usage = self._calc_response_usage(model, credentials, prompt_tokens, completion_tokens)
 

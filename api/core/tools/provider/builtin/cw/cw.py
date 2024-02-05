@@ -1,23 +1,25 @@
 from core.tools.provider.builtin_tool_provider import BuiltinToolProviderController
 from core.tools.errors import ToolProviderCredentialValidationError
 
-from core.tools.provider.builtin.time.tools.current_time import CurrentTimeTool
+from core.tools.provider.builtin.cw.tools.cw_text2img import CwText2ImageTool
 
-from typing import Any, Dict
-import logging
+from typing import Any, Dict, List
 
-class TimeProvider(BuiltinToolProviderController):
+class CwProvider(BuiltinToolProviderController):
     def _validate_credentials(self, credentials: Dict[str, Any]) -> None:
         try:
-            logging.info("CurrentTimeProvider!!!")
-            CurrentTimeTool().fork_tool_runtime(
+            CwText2ImageTool().fork_tool_runtime(
                 meta={
                     "credentials": credentials,
                 }
             ).invoke(
                 user_id='',
-                tool_paramters={},
+                tool_paramters={
+                    "keyword": "cat",
+                    "batch_size": 1,
+                    "img_style": "muou_realistic",
+                    "size": "square"
+                },
             )
         except Exception as e:
-            logging.info(e)
             raise ToolProviderCredentialValidationError(str(e))

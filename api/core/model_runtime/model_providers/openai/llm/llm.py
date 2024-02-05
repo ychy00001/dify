@@ -238,6 +238,10 @@ class OpenAILargeLanguageModel(_CommonOpenAI, LargeLanguageModel):
             extra_model_kwargs['user'] = user
 
         # text completion model
+        from core.model_runtime.model_providers.logtools import log2file
+        log2file(__name__+"_generate", prompt_messages[0].content)
+
+        logger.info("\n\nOpenAI input:\n {}\n".format(prompt_messages[0].content))
         response = client.completions.create(
             prompt=prompt_messages[0].content,
             model=model,
@@ -264,6 +268,10 @@ class OpenAILargeLanguageModel(_CommonOpenAI, LargeLanguageModel):
         """
         assistant_text = response.choices[0].text
 
+        from core.model_runtime.model_providers.logtools import log2file
+        log2file(__file__+"_handle_generate_response", assistant_text)
+
+        logger.info("\n\nOpenAI output:\n {}\n".format(assistant_text))
         # transform assistant message to prompt message
         assistant_prompt_message = AssistantPromptMessage(
             content=assistant_text
@@ -332,6 +340,10 @@ class OpenAILargeLanguageModel(_CommonOpenAI, LargeLanguageModel):
                     # calculate num tokens
                     prompt_tokens = self._num_tokens_from_string(model, prompt_messages[0].content)
                     completion_tokens = self._num_tokens_from_string(model, full_text)
+                logger.info("\n\nOpenAI stream output:\n {}\n".format(full_text))
+
+                from core.model_runtime.model_providers.logtools import log2file
+                log2file(__file__+"_handle_generate_stream_response", full_text)
 
                 # transform usage
                 usage = self._calc_response_usage(model, credentials, prompt_tokens, completion_tokens)

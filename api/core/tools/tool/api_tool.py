@@ -182,11 +182,11 @@ class ApiTool(Tool):
         
         # do http request
         if method == 'get':
-            response = httpx.get(url, params=params, headers=headers, cookies=cookies, timeout=10, follow_redirects=True)
+            response = httpx.get(url, params=params, headers=headers, cookies=cookies, timeout=60, follow_redirects=True)
         elif method == 'post':
-            response = httpx.post(url, params=params, headers=headers, cookies=cookies, data=body, timeout=10, follow_redirects=True)
+            response = httpx.post(url, params=params, headers=headers, cookies=cookies, data=body, timeout=60, follow_redirects=True)
         elif method == 'put':
-            response = httpx.put(url, params=params, headers=headers, cookies=cookies, data=body, timeout=10, follow_redirects=True)
+            response = httpx.put(url, params=params, headers=headers, cookies=cookies, data=body, timeout=60, follow_redirects=True)
         elif method == 'delete':
             """
             request body data is unsupported for DELETE method in standard http protocol

@@ -14,7 +14,7 @@ from langchain.agents import openai_functions_agent, openai_functions_multi_agen
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import AgentAction, AgentFinish, BaseMessage, ChatGeneration, LLMResult
 from models.model import Message, MessageAgentThought, MessageChain
-
+import json
 
 class AgentLoopGatherCallbackHandler(BaseCallbackHandler):
     """Callback Handler that prints to std out."""
@@ -103,11 +103,11 @@ class AgentLoopGatherCallbackHandler(BaseCallbackHandler):
     def on_llm_start(
         self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
     ) -> None:
-        pass
+        logging.info(f"Agent on_llm_start: {json.dumps(prompts, ensure_ascii=False)}")
 
     def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
         """Do nothing."""
-        pass
+        logging.info(f"Agent on_llm_end  prompt_messages: {json.dumps(response.prompt_messages, ensure_ascii=False)}: \n\n assistant_prompt_message: {json.dumps(response.message.content, ensure_ascii=False)}")
 
     def on_llm_error(
         self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any

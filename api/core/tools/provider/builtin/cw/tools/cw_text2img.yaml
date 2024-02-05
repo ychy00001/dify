@@ -1,0 +1,107 @@
+identity: # 工具的基本信息
+  name: cw_text2img # 工具名称，唯一，不允许和其他工具重名
+  author: Cloudwalk # 作者
+  label: # 标签，用于前端展示
+    en_US: CwText2Image # 英文标签
+    zh_Hans: 云从文生图 # 中文标签
+description: # 描述，用于前端展示
+  human: # 用于前端展示的介绍，支持多语言
+    en_US: A tool for generate image with human language.
+    zh_Hans: 根据输入的自然语言关键词生成相应的图片。
+  llm: A tool for generate image with human language. # 传递给LLM的介绍，为了使得LLM更好理解这个工具，我们建议在这里写上关于这个工具尽可能详细的信息，让LLM能够理解并使用这个工具
+parameters: # 参数列表
+  - name: keyword # 参数名称
+    type: string # 参数类型
+    required: true # 是否必填
+    label: # 参数标签
+      en_US: key world string # 英文标签
+      zh_Hans: 生图关键词 # 中文标签
+    human_description: # 用于前端展示的介绍，支持多语言
+      en_US: used for generage image
+      zh_Hans: 用于图片生成的关键词
+    llm_description: key words for generage image # 传递给LLM的介绍，同上，为了使得LLM更好理解这个参数，我们建议在这里写上关于这个参数尽可能详细的信息，让LLM能够理解这个参数
+    form: llm # 表单类型，llm表示这个参数需要由Agent自行推理出来，前端将不会展示这个参数
+  - name: batch_size
+    type: number # 参数类型
+    required: false
+    default: 1
+    label:
+      en_US: Result image number
+      zh_Hans: 图片个数
+    human_description:
+      en_US: used for generate the result number
+      zh_Hans: 用于结果展示个数
+    form: llm # 表单类型，form表示这个参数需要由用户在对话开始前在前端填写
+    min: 1
+    max: 10
+  - name: size
+    type: select
+    required: true
+    human_description:
+      en_US: selecting the image size
+      zh_Hans: 选择图像大小
+      pt_BR: selecting the image size
+    label:
+      en_US: Image size
+      zh_Hans: 图像大小
+      pt_BR: Image size
+    form: form
+    options:
+      - value: square
+        label:
+          en_US: Squre(1024x1024)
+          zh_Hans: 方(1024x1024)
+          pt_BR: Squre(1024x1024)
+      - value: vertical
+        label:
+          en_US: Vertical(1024x1792)
+          zh_Hans: 竖屏(1024x1792)
+          pt_BR: Vertical(1024x1792)
+      - value: horizontal
+        label:
+          en_US: Horizontal(1792x1024)
+          zh_Hans: 横屏(1792x1024)
+          pt_BR: Horizontal(1792x1024)
+    default: square
+  - name: img_style
+    type: select # 参数类型
+    required: true
+    label:
+      en_US: image style
+      zh_Hans: 图片风格
+    human_description:
+      en_US: used for generate the style for image
+      zh_Hans: 用于设置图片风格
+    form: llm # 表单类型，form表示这个参数需要由用户在对话开始前在前端填写
+    options:
+      - value: muou_realistic
+        label:
+          en_US: Realistic
+          zh_Hans: 现实
+          pt_BR: Realistic
+      - value: muou_illustration
+        label:
+          en_US: Illustration
+          zh_Hans: 插画
+          pt_BR: Illustration
+      - value: 动漫(Anime)
+        label:
+          en_US: Anime
+          zh_Hans: 动漫
+          pt_BR: Anime
+      - value: 连环漫画(Comic Book)
+        label:
+          en_US: Comic Book
+          zh_Hans: 连环漫画
+          pt_BR: Comic Book
+      - value: 剪纸艺术(Kirigami)
+        label:
+          en_US: Kirigami
+          zh_Hans: 剪纸艺术
+          pt_BR: Kirigami
+      - value: 黑白照片(Monochrome)
+        label:
+          en_US: Monochrome
+          zh_Hans: 黑白照片
+          pt_BR: Monochrome
+    default: muou_realistic

@@ -13,6 +13,11 @@ if not os.environ.get("DEBUG") or os.environ.get("DEBUG").lower() != 'true':
     import langchain
     langchain.verbose = True
 
+# os.environ["LOG_LEVEL"] = 'DEBUG'
+# import langchain
+# langchain.verbose = True
+# langchain.debug = True
+
 import json
 import logging
 import threading

@@ -1,6 +1,6 @@
 from abc import ABC
 from typing import List, Optional
-
+import logging
 from core.model_runtime.entities.llm_entities import LLMResult, LLMResultChunk
 from core.model_runtime.entities.message_entities import PromptMessage, PromptMessageTool
 from core.model_runtime.model_providers.__base.ai_model import AIModel
@@ -106,6 +106,7 @@ class Callback(ABC):
         """Print text with highlighting and no end characters."""
         text_to_print = self._get_colored_text(text, color) if color else text
         print(text_to_print, end=end)
+        logging.info("\n\n print_text:", text_to_print)
 
     def _get_colored_text(self, text: str, color: str) -> str:
         """Get colored text."""

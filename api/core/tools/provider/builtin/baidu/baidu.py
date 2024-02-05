@@ -1,23 +1,23 @@
 from core.tools.provider.builtin_tool_provider import BuiltinToolProviderController
 from core.tools.errors import ToolProviderCredentialValidationError
 
-from core.tools.provider.builtin.time.tools.current_time import CurrentTimeTool
+from core.tools.provider.builtin.baidu.tools.baidu_search import BaiduSearchTool
 
-from typing import Any, Dict
-import logging
+from typing import Any, Dict, List
 
-class TimeProvider(BuiltinToolProviderController):
+class BaiduProvider(BuiltinToolProviderController):
     def _validate_credentials(self, credentials: Dict[str, Any]) -> None:
         try:
-            logging.info("CurrentTimeProvider!!!")
-            CurrentTimeTool().fork_tool_runtime(
+            BaiduSearchTool().fork_tool_runtime(
                 meta={
                     "credentials": credentials,
                 }
             ).invoke(
                 user_id='',
-                tool_paramters={},
+                tool_paramters={
+                    "query": "test",
+                    "result_type": "text"
+                },
             )
         except Exception as e:
-            logging.info(e)
             raise ToolProviderCredentialValidationError(str(e))

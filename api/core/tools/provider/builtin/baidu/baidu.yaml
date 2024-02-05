@@ -1,0 +1,13 @@
+identity:
+  author: Cloudwalk
+  name: baidu
+  label:
+    en_US: Baidu
+    zh_Hans: 百度
+    pt_BR: Baidu
+  description:
+    en_US: Baidu
+    zh_Hans: BaiduSearch
+    pt_BR: Baidu
+  icon: icon.png
+credentials_for_provider:
