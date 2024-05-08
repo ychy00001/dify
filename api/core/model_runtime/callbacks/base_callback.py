@@ -1,6 +1,6 @@
 from abc import ABC
-from typing import List, Optional
-import logging
+from typing import Optional
+
 from core.model_runtime.entities.llm_entities import LLMResult, LLMResultChunk
 from core.model_runtime.entities.message_entities import PromptMessage, PromptMessageTool
 from core.model_runtime.model_providers.__base.ai_model import AIModel
@@ -23,7 +23,7 @@ class Callback(ABC):
 
     def on_before_invoke(self, llm_instance: AIModel, model: str, credentials: dict,
                          prompt_messages: list[PromptMessage], model_parameters: dict,
-                         tools: Optional[list[PromptMessageTool]] = None, stop: Optional[List[str]] = None,
+                         tools: Optional[list[PromptMessageTool]] = None, stop: Optional[list[str]] = None,
                          stream: bool = True, user: Optional[str] = None) -> None:
         """
         Before invoke callback
@@ -42,7 +42,7 @@ class Callback(ABC):
 
     def on_new_chunk(self, llm_instance: AIModel, chunk: LLMResultChunk, model: str, credentials: dict,
                      prompt_messages: list[PromptMessage], model_parameters: dict,
-                     tools: Optional[list[PromptMessageTool]] = None, stop: Optional[List[str]] = None,
+                     tools: Optional[list[PromptMessageTool]] = None, stop: Optional[list[str]] = None,
                      stream: bool = True, user: Optional[str] = None):
         """
         On new chunk callback
@@ -62,7 +62,7 @@ class Callback(ABC):
 
     def on_after_invoke(self, llm_instance: AIModel, result: LLMResult, model: str, credentials: dict,
                         prompt_messages: list[PromptMessage], model_parameters: dict,
-                        tools: Optional[list[PromptMessageTool]] = None, stop: Optional[List[str]] = None,
+                        tools: Optional[list[PromptMessageTool]] = None, stop: Optional[list[str]] = None,
                         stream: bool = True, user: Optional[str] = None) -> None:
         """
         After invoke callback
@@ -82,7 +82,7 @@ class Callback(ABC):
 
     def on_invoke_error(self, llm_instance: AIModel, ex: Exception, model: str, credentials: dict,
                         prompt_messages: list[PromptMessage], model_parameters: dict,
-                        tools: Optional[list[PromptMessageTool]] = None, stop: Optional[List[str]] = None,
+                        tools: Optional[list[PromptMessageTool]] = None, stop: Optional[list[str]] = None,
                         stream: bool = True, user: Optional[str] = None) -> None:
         """
         Invoke error callback
@@ -106,7 +106,6 @@ class Callback(ABC):
         """Print text with highlighting and no end characters."""
         text_to_print = self._get_colored_text(text, color) if color else text
         print(text_to_print, end=end)
-        logging.info("\n\n print_text:", text_to_print)
 
     def _get_colored_text(self, text: str, color: str) -> str:
         """Get colored text."""

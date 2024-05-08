@@ -1,10 +1,11 @@
 import os
 import sys
-from typing import Any, Dict, List, Union
+from typing import Any, Union
+
+from serpapi import GoogleSearch
 
 from core.tools.entities.tool_entities import ToolInvokeMessage
 from core.tools.tool.builtin_tool import BuiltinTool
-from serpapi import GoogleSearch
 
 
 class HiddenPrints:
@@ -47,7 +48,7 @@ class SerpAPI:
             res = search.get_dict()
         return res
 
-    def get_params(self, query: str) -> Dict[str, str]:
+    def get_params(self, query: str) -> dict[str, str]:
         """Get parameters for SerpAPI."""
         _params = {
             "api_key": self.serpapi_api_key,
@@ -69,43 +70,44 @@ class SerpAPI:
             raise ValueError(f"Got error from SerpAPI: {res['error']}")
         
         if typ == "text":
+            toret = ""
             if "answer_box" in res.keys() and type(res["answer_box"]) == list:
-                res["answer_box"] = res["answer_box"][0]
+                res["answer_box"] = res["answer_box"][0] + "\n"
             if "answer_box" in res.keys() and "answer" in res["answer_box"].keys():
-                toret = res["answer_box"]["answer"]
-            elif "answer_box" in res.keys() and "snippet" in res["answer_box"].keys():
-                toret = res["answer_box"]["snippet"]
-            elif (
+                toret += res["answer_box"]["answer"] + "\n"
+            if "answer_box" in res.keys() and "snippet" in res["answer_box"].keys():
+                toret += res["answer_box"]["snippet"] + "\n"
+            if (
                 "answer_box" in res.keys()
                 and "snippet_highlighted_words" in res["answer_box"].keys()
             ):
-                toret = res["answer_box"]["snippet_highlighted_words"][0]
-            elif (
+                for item in res["answer_box"]["snippet_highlighted_words"]:
+                    toret += item + "\n"
+            if (
                 "sports_results" in res.keys()
                 and "game_spotlight" in res["sports_results"].keys()
             ):
-                toret = res["sports_results"]["game_spotlight"]
-            elif (
+                toret += res["sports_results"]["game_spotlight"] + "\n"
+            if (
                 "shopping_results" in res.keys()
                 and "title" in res["shopping_results"][0].keys()
             ):
-                toret = res["shopping_results"][:3]
-            elif (
+                toret += res["shopping_results"][:3] + "\n"
+            if (
                 "knowledge_graph" in res.keys()
                 and "description" in res["knowledge_graph"].keys()
             ):
-                toret = res["knowledge_graph"]["description"]
-            elif "snippet" in res["organic_results"][0].keys():
-                toret = res["organic_results"][0]["snippet"]
-            elif "link" in res["organic_results"][0].keys():
-                toret = res["organic_results"][0]["link"]
-            elif (
+                toret = res["knowledge_graph"]["description"] + "\n"
+            if "snippet" in res["organic_results"][0].keys():
+                for item in res["organic_results"]:
+                    toret += "content: " + item["snippet"] + "\n" + "link: " + item["link"] + "\n"
+            if (
                 "images_results" in res.keys()
                 and "thumbnail" in res["images_results"][0].keys()
             ):
                 thumbnails = [item["thumbnail"] for item in res["images_results"][:10]]
                 toret = thumbnails
-            else:
+            if toret == "":
                 toret = "No good search result found"
         elif typ == "link":
             if "knowledge_graph" in res.keys() and "title" in res["knowledge_graph"].keys() \
@@ -147,8 +149,8 @@ class SerpAPI:
 class GoogleSearchTool(BuiltinTool):
     def _invoke(self, 
                 user_id: str,
-               tool_parameters: Dict[str, Any], 
-        ) -> Union[ToolInvokeMessage, List[ToolInvokeMessage]]:
+               tool_parameters: dict[str, Any], 
+        ) -> Union[ToolInvokeMessage, list[ToolInvokeMessage]]:
         """
             invoke tools
         """

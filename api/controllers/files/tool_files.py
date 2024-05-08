@@ -1,9 +1,10 @@
-from controllers.files import api
-from core.tools.tool_file_manager import ToolFileManager
 from flask import Response
 from flask_restful import Resource, reqparse
-from libs.exception import BaseHTTPException
 from werkzeug.exceptions import Forbidden, NotFound
+
+from controllers.files import api
+from core.tools.tool_file_manager import ToolFileManager
+from libs.exception import BaseHTTPException
 
 
 class ToolFilePreviewApi(Resource):
@@ -26,12 +27,12 @@ class ToolFilePreviewApi(Resource):
             raise Forbidden('Invalid request.')
         
         try:
-            result = ToolFileManager.get_file_generator_by_message_file_id(
+            result = ToolFileManager.get_file_generator_by_tool_file_id(
                 file_id,
             )
 
             if not result:
-                raise NotFound(f'file is not found')
+                raise NotFound('file is not found')
             
             generator, mimetype = result
         except Exception:

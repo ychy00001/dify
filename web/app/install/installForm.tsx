@@ -17,8 +17,6 @@ const validPassword = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/
 
 const InstallForm = () => {
   const { t } = useTranslation()
-  // const { locale } = useContext(I18n)
-  // const language = getModelRuntimeSupported(locale)
   const router = useRouter()
 
   const [email, setEmail] = React.useState('')
@@ -50,8 +48,10 @@ const InstallForm = () => {
       showErrorMessage(t('login.error.passwordEmpty'))
       return false
     }
-    if (!validPassword.test(password))
+    if (!validPassword.test(password)) {
       showErrorMessage(t('login.error.passwordInvalid'))
+      return false
+    }
 
     return true
   }

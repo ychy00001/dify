@@ -61,6 +61,11 @@ const TextGenerationItem: FC<TextGenerationItemProps> = ({
     sensitive_word_avoidance: moderationConfig,
     external_data_tools: externalDataToolsConfig,
     more_like_this: moreLikeThisConfig,
+    text_to_speech: {
+      enabled: false,
+      voice: '',
+      language: '',
+    },
     agent_mode: {
       enabled: false,
       tools: [],
@@ -78,7 +83,7 @@ const TextGenerationItem: FC<TextGenerationItemProps> = ({
   const {
     completion,
     handleSend,
-    isResponsing,
+    isResponding,
     messageId,
   } = useTextGeneration()
 
@@ -138,8 +143,8 @@ const TextGenerationItem: FC<TextGenerationItemProps> = ({
       innerClassName='grow flex flex-col'
       contentClassName='grow'
       content={completion}
-      isLoading={!completion && isResponsing}
-      isResponsing={isResponsing}
+      isLoading={!completion && isResponding}
+      isResponding={isResponding}
       isInstalledApp={false}
       messageId={messageId}
       isError={false}

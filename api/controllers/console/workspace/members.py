@@ -1,31 +1,17 @@
-# -*- coding:utf-8 -*-
+from flask import current_app
+from flask_login import current_user
+from flask_restful import Resource, abort, marshal_with, reqparse
+
 import services
 from controllers.console import api
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required, cloud_edition_billing_resource_check
 from extensions.ext_database import db
-from flask import current_app
-from flask_login import current_user
-from flask_restful import Resource, abort, fields, marshal_with, reqparse
-from libs.helper import TimestampField
+from fields.member_fields import account_with_role_list_fields
 from libs.login import login_required
-from models.account import Account
+from models.account import Account, TenantAccountRole
 from services.account_service import RegisterService, TenantService
-
-account_fields = {
-    'id': fields.String,
-    'name': fields.String,
-    'avatar': fields.String,
-    'email': fields.String,
-    'last_login_at': TimestampField,
-    'created_at': TimestampField,
-    'role': fields.String,
-    'status': fields.String,
-}
-
-account_list_fields = {
-    'accounts': fields.List(fields.Nested(account_fields))
-}
+from services.errors.account import AccountAlreadyInTenantError
 
 
 class MemberListApi(Resource):
@@ -34,7 +20,7 @@ class MemberListApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @marshal_with(account_list_fields)
+    @marshal_with(account_with_role_list_fields)
     def get(self):
         members = TenantService.get_tenant_members(current_user.current_tenant)
         return {'result': 'success', 'accounts': members}, 200
@@ -57,7 +43,7 @@ class MemberInviteEmailApi(Resource):
         invitee_emails = args['emails']
         invitee_role = args['role']
         interface_language = args['language']
-        if invitee_role not in ['admin', 'normal']:
+        if invitee_role not in [TenantAccountRole.ADMIN, TenantAccountRole.NORMAL]:
             return {'code': 'invalid-role', 'message': 'Invalid role'}, 400
 
         inviter = current_user
@@ -71,6 +57,13 @@ class MemberInviteEmailApi(Resource):
                     'email': invitee_email,
                     'url': f'{console_web_url}/activate?email={invitee_email}&token={token}'
                 })
+            except AccountAlreadyInTenantError:
+                invitation_results.append({
+                    'status': 'success',
+                    'email': invitee_email,
+                    'url': f'{console_web_url}/signin'
+                })
+                break
             except Exception as e:
                 invitation_results.append({
                     'status': 'failed',

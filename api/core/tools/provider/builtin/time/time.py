@@ -1,12 +1,12 @@
-from typing import Any, Dict
+from typing import Any
 
 from core.tools.errors import ToolProviderCredentialValidationError
 from core.tools.provider.builtin.time.tools.current_time import CurrentTimeTool
 from core.tools.provider.builtin_tool_provider import BuiltinToolProviderController
 
 
-class TimeProvider(BuiltinToolProviderController):
-    def _validate_credentials(self, credentials: Dict[str, Any]) -> None:
+class WikiPediaProvider(BuiltinToolProviderController):
+    def _validate_credentials(self, credentials: dict[str, Any]) -> None:
         try:
             CurrentTimeTool().invoke(
                 user_id='',

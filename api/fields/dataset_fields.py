@@ -1,4 +1,5 @@
 from flask_restful import fields
+
 from libs.helper import TimestampField
 
 dataset_fields = {
@@ -26,6 +27,11 @@ dataset_retrieval_model_fields = {
     'score_threshold': fields.Float
 }
 
+tag_fields = {
+    'id': fields.String,
+    'name': fields.String,
+    'type': fields.String
+}
 
 dataset_detail_fields = {
     'id': fields.String,
@@ -45,7 +51,8 @@ dataset_detail_fields = {
     'embedding_model': fields.String,
     'embedding_model_provider': fields.String,
     'embedding_available': fields.Boolean,
-    'retrieval_model_dict': fields.Nested(dataset_retrieval_model_fields)
+    'retrieval_model_dict': fields.Nested(dataset_retrieval_model_fields),
+    'tags': fields.List(fields.Nested(tag_fields))
 }
 
 dataset_query_detail_fields = {

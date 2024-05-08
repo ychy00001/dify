@@ -1,36 +1,42 @@
-# -*- coding:utf-8 -*-
 import logging
+
+from flask import request
+from werkzeug.exceptions import InternalServerError
 
 import services
 from controllers.console import api
-from controllers.console.app.error import (AppUnavailableError, AudioTooLargeError, CompletionRequestError,
-                                           NoAudioUploadedError, ProviderModelCurrentlyNotSupportError,
-                                           ProviderNotInitializeError, ProviderNotSupportSpeechToTextError,
-                                           ProviderQuotaExceededError, UnsupportedAudioTypeError)
+from controllers.console.app.error import (
+    AppUnavailableError,
+    AudioTooLargeError,
+    CompletionRequestError,
+    NoAudioUploadedError,
+    ProviderModelCurrentlyNotSupportError,
+    ProviderNotInitializeError,
+    ProviderNotSupportSpeechToTextError,
+    ProviderQuotaExceededError,
+    UnsupportedAudioTypeError,
+)
 from controllers.console.explore.wraps import InstalledAppResource
 from core.errors.error import ModelCurrentlyNotSupportError, ProviderTokenNotInitError, QuotaExceededError
 from core.model_runtime.errors.invoke import InvokeError
-from flask import request
-from models.model import AppModelConfig
 from services.audio_service import AudioService
-from services.errors.audio import (AudioTooLargeServiceError, NoAudioUploadedServiceError,
-                                   ProviderNotSupportSpeechToTextServiceError, UnsupportedAudioTypeServiceError)
-from werkzeug.exceptions import InternalServerError
+from services.errors.audio import (
+    AudioTooLargeServiceError,
+    NoAudioUploadedServiceError,
+    ProviderNotSupportSpeechToTextServiceError,
+    UnsupportedAudioTypeServiceError,
+)
 
 
 class ChatAudioApi(InstalledAppResource):
     def post(self, installed_app):
         app_model = installed_app.app
-        app_model_config: AppModelConfig = app_model.app_model_config
-
-        if not app_model_config.speech_to_text_dict['enabled']:
-            raise AppUnavailableError()
 
         file = request.files['file']
 
         try:
             response = AudioService.transcript_asr(
-                tenant_id=app_model.tenant_id,
+                app_model=app_model,
                 file=file,
                 end_user=None
             )
@@ -65,15 +71,12 @@ class ChatAudioApi(InstalledAppResource):
 class ChatTextApi(InstalledAppResource):
     def post(self, installed_app):
         app_model = installed_app.app
-        app_model_config: AppModelConfig = app_model.app_model_config
-
-        if not app_model_config.text_to_speech_dict['enabled']:
-            raise AppUnavailableError()
 
         try:
             response = AudioService.transcript_tts(
-                tenant_id=app_model.tenant_id,
+                app_model=app_model,
                 text=request.form['text'],
+                voice=request.form.get('voice'),
                 streaming=False
             )
             return {'data': response.data.decode('latin1')}

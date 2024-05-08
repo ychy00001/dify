@@ -1,4 +1,5 @@
 import type { FC } from 'react'
+import { memo } from 'react'
 import type { ChatItem } from '../../types'
 import { Markdown } from '@/app/components/base/markdown'
 
@@ -16,7 +17,7 @@ const BasicContent: FC<BasicContentProps> = ({
   if (annotation?.logAnnotation)
     return <Markdown content={annotation?.logAnnotation.content || ''} />
 
-  return <Markdown content={content} />
+  return <Markdown content={content} className={`${item.isError && '!text-[#F04438]'}`} />
 }
 
-export default BasicContent
+export default memo(BasicContent)

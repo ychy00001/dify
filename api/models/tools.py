@@ -1,14 +1,13 @@
 import json
-from enum import Enum
-from typing import List
+
+from sqlalchemy import ForeignKey
 
 from core.tools.entities.common_entities import I18nObject
 from core.tools.entities.tool_bundle import ApiBasedToolBundle
-from core.tools.entities.tool_entities import ApiProviderSchemaType, ToolRuntimeVariablePool
+from core.tools.entities.tool_entities import ApiProviderSchemaType
 from extensions.ext_database import db
+from models import StringUUID
 from models.model import Account, App, Tenant
-from sqlalchemy import ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 
 
 class BuiltinToolProvider(db.Model):
@@ -23,11 +22,11 @@ class BuiltinToolProvider(db.Model):
     )
 
     # id of the tool provider
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     # id of the tenant
-    tenant_id = db.Column(UUID, nullable=True)
+    tenant_id = db.Column(StringUUID, nullable=True)
     # who created this tool provider
-    user_id = db.Column(UUID, nullable=False)
+    user_id = db.Column(StringUUID, nullable=False)
     # name of the tool provider
     provider = db.Column(db.String(40), nullable=False)
     # credential of the tool provider
@@ -50,16 +49,16 @@ class PublishedAppTool(db.Model):
     )
 
     # id of the tool provider
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     # id of the app
-    app_id = db.Column(UUID, ForeignKey('apps.id'), nullable=False)
+    app_id = db.Column(StringUUID, ForeignKey('apps.id'), nullable=False)
     # who published this tool
-    user_id = db.Column(UUID, nullable=False)
+    user_id = db.Column(StringUUID, nullable=False)
     # description of the tool, stored in i18n format, for human
     description = db.Column(db.Text, nullable=False)
     # llm_description of the tool, for LLM
     llm_description = db.Column(db.Text, nullable=False)
-    # query decription, query will be seem as a parameter of the tool, to describe this parameter to llm, we need this field
+    # query description, query will be seem as a parameter of the tool, to describe this parameter to llm, we need this field
     query_description = db.Column(db.Text, nullable=False)
     # query name, the name of the query parameter
     query_name = db.Column(db.String(40), nullable=False)
@@ -88,7 +87,7 @@ class ApiToolProvider(db.Model):
         db.UniqueConstraint('name', 'tenant_id', name='unique_api_tool_provider')
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     # name of the api provider
     name = db.Column(db.String(40), nullable=False)
     # icon
@@ -97,9 +96,9 @@ class ApiToolProvider(db.Model):
     schema = db.Column(db.Text, nullable=False)
     schema_type_str = db.Column(db.String(40), nullable=False)
     # who created this tool
-    user_id = db.Column(UUID, nullable=False)
+    user_id = db.Column(StringUUID, nullable=False)
     # tenant id
-    tenant_id = db.Column(UUID, nullable=False)
+    tenant_id = db.Column(StringUUID, nullable=False)
     # description of the provider
     description = db.Column(db.Text, nullable=False)
     # json format tools
@@ -117,16 +116,12 @@ class ApiToolProvider(db.Model):
         return ApiProviderSchemaType.value_of(self.schema_type_str)
     
     @property
-    def tools(self) -> List[ApiBasedToolBundle]:
+    def tools(self) -> list[ApiBasedToolBundle]:
         return [ApiBasedToolBundle(**tool) for tool in json.loads(self.tools_str)]
     
     @property
     def credentials(self) -> dict:
         return json.loads(self.credentials_str)
-    
-    @property
-    def is_taned(self) -> bool:
-        return self.tenant_id is not None
     
     @property
     def user(self) -> Account:
@@ -145,11 +140,11 @@ class ToolModelInvoke(db.Model):
         db.PrimaryKeyConstraint('id', name='tool_model_invoke_pkey'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     # who invoke this tool
-    user_id = db.Column(UUID, nullable=False)
+    user_id = db.Column(StringUUID, nullable=False)
     # tenant id
-    tenant_id = db.Column(UUID, nullable=False)
+    tenant_id = db.Column(StringUUID, nullable=False)
     # provider
     provider = db.Column(db.String(40), nullable=False)
     # type
@@ -185,13 +180,13 @@ class ToolConversationVariables(db.Model):
         db.Index('conversation_id_idx', 'conversation_id'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     # conversation user id
-    user_id = db.Column(UUID, nullable=False)
+    user_id = db.Column(StringUUID, nullable=False)
     # tenant id
-    tenant_id = db.Column(UUID, nullable=False)
+    tenant_id = db.Column(StringUUID, nullable=False)
     # conversation id
-    conversation_id = db.Column(UUID, nullable=False)
+    conversation_id = db.Column(StringUUID, nullable=False)
     # variables pool
     variables_str = db.Column(db.Text, nullable=False)
 
@@ -213,13 +208,13 @@ class ToolFile(db.Model):
         db.Index('tool_file_conversation_id_idx', 'conversation_id'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     # conversation user id
-    user_id = db.Column(UUID, nullable=False)
+    user_id = db.Column(StringUUID, nullable=False)
     # tenant id
-    tenant_id = db.Column(UUID, nullable=False)
+    tenant_id = db.Column(StringUUID, nullable=False)
     # conversation id
-    conversation_id = db.Column(UUID, nullable=False)
+    conversation_id = db.Column(StringUUID, nullable=True)
     # file key
     file_key = db.Column(db.String(255), nullable=False)
     # mime type

@@ -1,3 +1,6 @@
+from flask import request
+from flask_restful import marshal, reqparse
+
 import services.dataset_service
 from controllers.service_api import api
 from controllers.service_api.dataset.error import DatasetNameDuplicateError
@@ -5,8 +8,6 @@ from controllers.service_api.wraps import DatasetApiResource
 from core.model_runtime.entities.model_entities import ModelType
 from core.provider_manager import ProviderManager
 from fields.dataset_fields import dataset_detail_fields
-from flask import request
-from flask_restful import marshal, reqparse
 from libs.login import current_user
 from models.dataset import Dataset
 from services.dataset_service import DatasetService
@@ -25,8 +26,11 @@ class DatasetApi(DatasetApiResource):
         page = request.args.get('page', default=1, type=int)
         limit = request.args.get('limit', default=20, type=int)
         provider = request.args.get('provider', default="vendor")
+        search = request.args.get('keyword', default=None, type=str)
+        tag_ids = request.args.getlist('tag_ids')
+
         datasets, total = DatasetService.get_datasets(page, limit, provider,
-                                                      tenant_id, current_user)
+                                                      tenant_id, current_user, search, tag_ids)
         # check embedding setting
         provider_manager = ProviderManager()
         configurations = provider_manager.get_configurations(

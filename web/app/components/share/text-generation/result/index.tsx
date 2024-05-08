@@ -3,19 +3,24 @@ import type { FC } from 'react'
 import React, { useEffect, useRef, useState } from 'react'
 import { useBoolean } from 'ahooks'
 import { t } from 'i18next'
+import produce from 'immer'
 import cn from 'classnames'
 import TextGenerationRes from '@/app/components/app/text-generate/item'
 import NoData from '@/app/components/share/text-generation/no-data'
 import Toast from '@/app/components/base/toast'
-import { sendCompletionMessage, updateFeedback } from '@/service/share'
+import { sendCompletionMessage, sendWorkflowMessage, updateFeedback } from '@/service/share'
 import type { Feedbacktype } from '@/app/components/app/chat/type'
 import Loading from '@/app/components/base/loading'
 import type { PromptConfig } from '@/models/debug'
 import type { InstalledApp } from '@/models/explore'
 import type { ModerationService } from '@/models/common'
 import { TransferMethod, type VisionFile, type VisionSettings } from '@/types/app'
+import { NodeRunningStatus, WorkflowRunningStatus } from '@/app/components/workflow/types'
+import type { WorkflowProcess } from '@/app/components/base/chat/types'
+import { sleep } from '@/utils'
 
 export type IResultProps = {
+  isWorkflow: boolean
   isCallBatchAPI: boolean
   isPC: boolean
   isMobile: boolean
@@ -40,6 +45,7 @@ export type IResultProps = {
 }
 
 const Result: FC<IResultProps> = ({
+  isWorkflow,
   isCallBatchAPI,
   isPC,
   isMobile,
@@ -60,19 +66,27 @@ const Result: FC<IResultProps> = ({
   visionConfig,
   completionFiles,
 }) => {
-  const [isResponsing, { setTrue: setResponsingTrue, setFalse: setResponsingFalse }] = useBoolean(false)
+  const [isResponding, { setTrue: setRespondingTrue, setFalse: setRespondingFalse }] = useBoolean(false)
   useEffect(() => {
     if (controlStopResponding)
-      setResponsingFalse()
+      setRespondingFalse()
   }, [controlStopResponding])
 
-  const [completionRes, doSetCompletionRes] = useState('')
-  const completionResRef = useRef('')
-  const setCompletionRes = (res: string) => {
+  const [completionRes, doSetCompletionRes] = useState<any>('')
+  const completionResRef = useRef<any>()
+  const setCompletionRes = (res: any) => {
     completionResRef.current = res
     doSetCompletionRes(res)
   }
   const getCompletionRes = () => completionResRef.current
+  const [workflowProcessData, doSetWorkflowProccessData] = useState<WorkflowProcess>()
+  const workflowProcessDataRef = useRef<WorkflowProcess>()
+  const setWorkflowProccessData = (data: WorkflowProcess) => {
+    workflowProcessDataRef.current = data
+    doSetWorkflowProccessData(data)
+  }
+  const getWorkflowProccessData = () => workflowProcessDataRef.current
+
   const { notify } = Toast
   const isNoData = !completionRes
 
@@ -96,8 +110,13 @@ const Result: FC<IResultProps> = ({
       return true
 
     const prompt_variables = promptConfig?.prompt_variables
-    if (!prompt_variables || prompt_variables?.length === 0)
+    if (!prompt_variables || prompt_variables?.length === 0) {
+      if (completionFiles.find(item => item.transfer_method === TransferMethod.local_file && !item.upload_file_id)) {
+        notify({ type: 'info', message: t('appDebug.errorMessage.waitForImgUpload') })
+        return false
+      }
       return true
+    }
 
     let hasEmptyInput = ''
     const requiredVars = prompt_variables?.filter(({ key, name, required }) => {
@@ -125,7 +144,7 @@ const Result: FC<IResultProps> = ({
   }
 
   const handleSend = async () => {
-    if (isResponsing) {
+    if (isResponding) {
       notify({ type: 'info', message: t('appDebug.errorMessage.waitForResponse') })
       return false
     }
@@ -160,45 +179,123 @@ const Result: FC<IResultProps> = ({
     if (!isPC)
       onShowRes()
 
-    setResponsingTrue()
-    const startTime = Date.now()
-    let isTimeout = false
-    const runId = setInterval(() => {
-      if (Date.now() - startTime > 1000 * 60) { // 1min timeout
-        clearInterval(runId)
-        setResponsingFalse()
+    setRespondingTrue()
+    let isEnd = false
+    let isTimeout = false;
+    (async () => {
+      await sleep(1000 * 60) // 1min timeout
+      if (!isEnd) {
+        setRespondingFalse()
         onCompleted(getCompletionRes(), taskId, false)
         isTimeout = true
       }
-    }, 1000)
-    sendCompletionMessage(data, {
-      onData: (data: string, _isFirstMessage: boolean, { messageId }) => {
-        tempMessageId = messageId
-        res.push(data)
-        setCompletionRes(res.join(''))
-      },
-      onCompleted: () => {
-        if (isTimeout)
-          return
+    })()
 
-        setResponsingFalse()
-        setMessageId(tempMessageId)
-        onCompleted(getCompletionRes(), taskId, true)
-        clearInterval(runId)
-      },
-      onMessageReplace: (messageReplace) => {
-        res = [messageReplace.answer]
-        setCompletionRes(res.join(''))
-      },
-      onError() {
-        if (isTimeout)
-          return
-
-        setResponsingFalse()
-        onCompleted(getCompletionRes(), taskId, false)
-        clearInterval(runId)
-      },
-    }, isInstalledApp, installedAppInfo?.id)
+    if (isWorkflow) {
+      sendWorkflowMessage(
+        data,
+        {
+          onWorkflowStarted: ({ workflow_run_id }) => {
+            tempMessageId = workflow_run_id
+            setWorkflowProccessData({
+              status: WorkflowRunningStatus.Running,
+              tracing: [],
+              expand: false,
+              resultText: '',
+            })
+            setRespondingFalse()
+          },
+          onNodeStarted: ({ data }) => {
+            setWorkflowProccessData(produce(getWorkflowProccessData()!, (draft) => {
+              draft.expand = true
+              draft.tracing!.push({
+                ...data,
+                status: NodeRunningStatus.Running,
+                expand: true,
+              } as any)
+            }))
+          },
+          onNodeFinished: ({ data }) => {
+            setWorkflowProccessData(produce(getWorkflowProccessData()!, (draft) => {
+              const currentIndex = draft.tracing!.findIndex(trace => trace.node_id === data.node_id)
+              if (currentIndex > -1 && draft.tracing) {
+                draft.tracing[currentIndex] = {
+                  ...(draft.tracing[currentIndex].extras
+                    ? { extras: draft.tracing[currentIndex].extras }
+                    : {}),
+                  ...data,
+                  expand: !!data.error,
+                } as any
+              }
+            }))
+          },
+          onWorkflowFinished: ({ data }) => {
+            if (isTimeout)
+              return
+            if (data.error) {
+              notify({ type: 'error', message: data.error })
+              setRespondingFalse()
+              onCompleted(getCompletionRes(), taskId, false)
+              isEnd = true
+              return
+            }
+            setWorkflowProccessData(produce(getWorkflowProccessData()!, (draft) => {
+              draft.status = data.error ? WorkflowRunningStatus.Failed : WorkflowRunningStatus.Succeeded
+            }))
+            if (!data.outputs)
+              setCompletionRes('')
+            else
+              setCompletionRes(data.outputs)
+            setRespondingFalse()
+            setMessageId(tempMessageId)
+            onCompleted(getCompletionRes(), taskId, true)
+            isEnd = true
+          },
+          onTextChunk: (params) => {
+            const { data: { text } } = params
+            setWorkflowProccessData(produce(getWorkflowProccessData()!, (draft) => {
+              draft.resultText += text
+            }))
+          },
+          onTextReplace: (params) => {
+            const { data: { text } } = params
+            setWorkflowProccessData(produce(getWorkflowProccessData()!, (draft) => {
+              draft.resultText = text
+            }))
+          },
+        },
+        isInstalledApp,
+        installedAppInfo?.id,
+      )
+    }
+    else {
+      sendCompletionMessage(data, {
+        onData: (data: string, _isFirstMessage: boolean, { messageId }) => {
+          tempMessageId = messageId
+          res.push(data)
+          setCompletionRes(res.join(''))
+        },
+        onCompleted: () => {
+          if (isTimeout)
+            return
+          setRespondingFalse()
+          setMessageId(tempMessageId)
+          onCompleted(getCompletionRes(), taskId, true)
+          isEnd = true
+        },
+        onMessageReplace: (messageReplace) => {
+          res = [messageReplace.answer]
+          setCompletionRes(res.join(''))
+        },
+        onError() {
+          if (isTimeout)
+            return
+          setRespondingFalse()
+          onCompleted(getCompletionRes(), taskId, false)
+          isEnd = true
+        },
+      }, isInstalledApp, installedAppInfo?.id)
+    }
   }
 
   const [controlClearMoreLikeThis, setControlClearMoreLikeThis] = useState(0)
@@ -216,6 +313,8 @@ const Result: FC<IResultProps> = ({
 
   const renderTextGenerationRes = () => (
     <TextGenerationRes
+      isWorkflow={isWorkflow}
+      workflowProcessData={workflowProcessData}
       className='mt-3'
       isError={isError}
       onRetry={handleSend}
@@ -229,7 +328,7 @@ const Result: FC<IResultProps> = ({
       isMobile={isMobile}
       isInstalledApp={isInstalledApp}
       installedAppId={installedAppInfo?.id}
-      isLoading={isCallBatchAPI ? (!completionRes && isResponsing) : false}
+      isLoading={isCallBatchAPI ? (!completionRes && isResponding) : false}
       taskId={isCallBatchAPI ? ((taskId as number) < 10 ? `0${taskId}` : `${taskId}`) : undefined}
       controlClearMoreLikeThis={controlClearMoreLikeThis}
       isShowTextToSpeech={isShowTextToSpeech}
@@ -239,14 +338,14 @@ const Result: FC<IResultProps> = ({
   return (
     <div className={cn(isNoData && !isCallBatchAPI && 'h-full')}>
       {!isCallBatchAPI && (
-        (isResponsing && !completionRes)
+        (isResponding && !completionRes)
           ? (
             <div className='flex h-full w-full justify-center items-center'>
               <Loading type='area' />
             </div>)
           : (
             <>
-              {isNoData
+              {(isNoData && !workflowProcessData)
                 ? <NoData />
                 : renderTextGenerationRes()
               }

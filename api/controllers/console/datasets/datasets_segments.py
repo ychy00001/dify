@@ -1,30 +1,34 @@
-# -*- coding:utf-8 -*-
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
+from flask import request
+from flask_login import current_user
+from flask_restful import Resource, marshal, reqparse
+from werkzeug.exceptions import Forbidden, NotFound
+
 import services
 from controllers.console import api
 from controllers.console.app.error import ProviderNotInitializeError
 from controllers.console.datasets.error import InvalidActionError, NoFileUploadedError, TooManyFilesError
 from controllers.console.setup import setup_required
-from controllers.console.wraps import account_initialization_required, cloud_edition_billing_resource_check
+from controllers.console.wraps import (
+    account_initialization_required,
+    cloud_edition_billing_knowledge_limit_check,
+    cloud_edition_billing_resource_check,
+)
 from core.errors.error import LLMBadRequestError, ProviderTokenNotInitError
 from core.model_manager import ModelManager
 from core.model_runtime.entities.model_entities import ModelType
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
 from fields.segment_fields import segment_fields
-from flask import request
-from flask_login import current_user
-from flask_restful import Resource, marshal, reqparse
 from libs.login import login_required
 from models.dataset import DocumentSegment
 from services.dataset_service import DatasetService, DocumentService, SegmentService
 from tasks.batch_create_segment_to_index_task import batch_create_segment_to_index_task
 from tasks.disable_segment_from_index_task import disable_segment_from_index_task
 from tasks.enable_segment_to_index_task import enable_segment_to_index_task
-from werkzeug.exceptions import Forbidden, NotFound
 
 
 class DatasetDocumentSegmentListApi(Resource):
@@ -142,8 +146,8 @@ class DatasetDocumentSegmentApi(Resource):
                 )
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
-                    f"No Embedding Model available. Please configure a valid provider "
-                    f"in the Settings -> Model Provider.")
+                    "No Embedding Model available. Please configure a valid provider "
+                    "in the Settings -> Model Provider.")
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
 
@@ -188,7 +192,7 @@ class DatasetDocumentSegmentApi(Resource):
                 raise InvalidActionError("Segment is already disabled.")
 
             segment.enabled = False
-            segment.disabled_at = datetime.utcnow()
+            segment.disabled_at = datetime.now(timezone.utc).replace(tzinfo=None)
             segment.disabled_by = current_user.id
             db.session.commit()
 
@@ -207,6 +211,7 @@ class DatasetDocumentSegmentAddApi(Resource):
     @login_required
     @account_initialization_required
     @cloud_edition_billing_resource_check('vector_space')
+    @cloud_edition_billing_knowledge_limit_check('add_segment')
     def post(self, dataset_id, document_id):
         # check dataset
         dataset_id = str(dataset_id)
@@ -233,8 +238,8 @@ class DatasetDocumentSegmentAddApi(Resource):
                 )
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
-                    f"No Embedding Model available. Please configure a valid provider "
-                    f"in the Settings -> Model Provider.")
+                    "No Embedding Model available. Please configure a valid provider "
+                    "in the Settings -> Model Provider.")
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
         try:
@@ -285,8 +290,8 @@ class DatasetDocumentSegmentUpdateApi(Resource):
                 )
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
-                    f"No Embedding Model available. Please configure a valid provider "
-                    f"in the Settings -> Model Provider.")
+                    "No Embedding Model available. Please configure a valid provider "
+                    "in the Settings -> Model Provider.")
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
             # check segment
@@ -357,6 +362,7 @@ class DatasetDocumentSegmentBatchImportApi(Resource):
     @login_required
     @account_initialization_required
     @cloud_edition_billing_resource_check('vector_space')
+    @cloud_edition_billing_knowledge_limit_check('add_segment')
     def post(self, dataset_id, document_id):
         # check dataset
         dataset_id = str(dataset_id)

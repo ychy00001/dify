@@ -1,15 +1,16 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import requests
-from constants.languages import languages
-from extensions.ext_database import db
 from flask import current_app, redirect, request
 from flask_restful import Resource
+
+from constants.languages import languages
+from extensions.ext_database import db
 from libs.oauth import GitHubOAuth, GoogleOAuth, OAuthUserInfo
 from models.account import Account, AccountStatus
-from services.account_service import AccountService, RegisterService
+from services.account_service import AccountService, RegisterService, TenantService
 
 from .. import api
 
@@ -72,8 +73,10 @@ class OAuthCallback(Resource):
 
         if account.status == AccountStatus.PENDING.value:
             account.status = AccountStatus.ACTIVE.value
-            account.initialized_at = datetime.utcnow()
+            account.initialized_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
+
+        TenantService.create_owner_tenant_if_not_exist(account)
 
         AccountService.update_last_login(account, request)
 

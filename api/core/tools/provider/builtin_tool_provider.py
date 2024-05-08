@@ -1,16 +1,21 @@
-import importlib
 from abc import abstractmethod
 from os import listdir, path
-from typing import Any, Dict, List
+from typing import Any
+
+from yaml import FullLoader, load
 
 from core.tools.entities.tool_entities import ToolParameter, ToolProviderCredentials, ToolProviderType
 from core.tools.entities.user_entities import UserToolProviderCredentials
-from core.tools.errors import (ToolNotFoundError, ToolParameterValidationError, ToolProviderCredentialValidationError,
-                               ToolProviderNotFoundError)
+from core.tools.errors import (
+    ToolNotFoundError,
+    ToolParameterValidationError,
+    ToolProviderCredentialValidationError,
+    ToolProviderNotFoundError,
+)
 from core.tools.provider.tool_provider import ToolProviderController
 from core.tools.tool.builtin_tool import BuiltinTool
 from core.tools.tool.tool import Tool
-from yaml import FullLoader, load
+from core.utils.module_import_helper import load_single_subclass_from_source
 
 
 class BuiltinToolProviderController(ToolProviderController):
@@ -23,7 +28,7 @@ class BuiltinToolProviderController(ToolProviderController):
         provider = self.__class__.__module__.split('.')[-1]
         yaml_path = path.join(path.dirname(path.realpath(__file__)), 'builtin', provider, f'{provider}.yaml')
         try:
-            with open(yaml_path, 'r') as f:
+            with open(yaml_path, 'rb') as f:
                 provider_yaml = load(f.read(), FullLoader)
         except:
             raise ToolProviderNotFoundError(f'can not load provider yaml for {provider}')
@@ -38,7 +43,7 @@ class BuiltinToolProviderController(ToolProviderController):
             'credentials_schema': provider_yaml['credentials_for_provider'] if 'credentials_for_provider' in provider_yaml else None,
         })
 
-    def _get_builtin_tools(self) -> List[Tool]:
+    def _get_builtin_tools(self) -> list[Tool]:
         """
             returns a list of tools that the provider can provide
 
@@ -53,27 +58,23 @@ class BuiltinToolProviderController(ToolProviderController):
         tool_files = list(filter(lambda x: x.endswith(".yaml") and not x.startswith("__"), listdir(tool_path)))
         tools = []
         for tool_file in tool_files:
-            with open(path.join(tool_path, tool_file), "r") as f:
+            with open(path.join(tool_path, tool_file), encoding='utf-8') as f:
                 # get tool name
                 tool_name = tool_file.split(".")[0]
                 tool = load(f.read(), FullLoader)
                 # get tool class, import the module
-                py_path = path.join(path.dirname(path.realpath(__file__)), 'builtin', provider, 'tools', f'{tool_name}.py')
-                spec = importlib.util.spec_from_file_location(f'core.tools.provider.builtin.{provider}.tools.{tool_name}', py_path)
-                mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(mod)
-
-                # get all the classes in the module
-                classes = [x for _, x in vars(mod).items() 
-                    if isinstance(x, type) and x not in [BuiltinTool, Tool] and issubclass(x, BuiltinTool)
-                ]
-                assistant_tool_class = classes[0]
+                assistant_tool_class = load_single_subclass_from_source(
+                    module_name=f'core.tools.provider.builtin.{provider}.tools.{tool_name}',
+                    script_path=path.join(path.dirname(path.realpath(__file__)),
+                                           'builtin', provider, 'tools', f'{tool_name}.py'),
+                    parent_type=BuiltinTool)
+                tool["identity"]["provider"] = provider
                 tools.append(assistant_tool_class(**tool))
 
         self.tools = tools
         return tools
     
-    def get_credentials_schema(self) -> Dict[str, ToolProviderCredentials]:
+    def get_credentials_schema(self) -> dict[str, ToolProviderCredentials]:
         """
             returns the credentials schema of the provider
 
@@ -93,7 +94,7 @@ class BuiltinToolProviderController(ToolProviderController):
         credentials = self.credentials_schema.copy()
         return UserToolProviderCredentials(credentials=credentials)
 
-    def get_tools(self) -> List[Tool]:
+    def get_tools(self) -> list[Tool]:
         """
             returns a list of tools that the provider can provide
 
@@ -107,7 +108,7 @@ class BuiltinToolProviderController(ToolProviderController):
         """
         return next(filter(lambda x: x.identity.name == tool_name, self.get_tools()), None)
 
-    def get_parameters(self, tool_name: str) -> List[ToolParameter]:
+    def get_parameters(self, tool_name: str) -> list[ToolParameter]:
         """
             returns the parameters of the tool
 
@@ -126,7 +127,8 @@ class BuiltinToolProviderController(ToolProviderController):
 
             :return: whether the provider needs credentials
         """
-        return self.credentials_schema is not None and len(self.credentials_schema) != 0
+        return self.credentials_schema is not None and \
+            len(self.credentials_schema) != 0
 
     @property
     def app_type(self) -> ToolProviderType:
@@ -137,7 +139,7 @@ class BuiltinToolProviderController(ToolProviderController):
         """
         return ToolProviderType.BUILT_IN
 
-    def validate_parameters(self, tool_id: int, tool_name: str, tool_parameters: Dict[str, Any]) -> None:
+    def validate_parameters(self, tool_id: int, tool_name: str, tool_parameters: dict[str, Any]) -> None:
         """
             validate the parameters of the tool and set the default value if needed
 
@@ -146,7 +148,7 @@ class BuiltinToolProviderController(ToolProviderController):
         """
         tool_parameters_schema = self.get_parameters(tool_name)
         
-        tool_parameters_need_to_validate: Dict[str, ToolParameter] = {}
+        tool_parameters_need_to_validate: dict[str, ToolParameter] = {}
         for parameter in tool_parameters_schema:
             tool_parameters_need_to_validate[parameter.name] = parameter
 
@@ -161,7 +163,7 @@ class BuiltinToolProviderController(ToolProviderController):
                     raise ToolParameterValidationError(f'parameter {parameter} should be string')
             
             elif parameter_schema.type == ToolParameter.ToolParameterType.NUMBER:
-                if not isinstance(tool_parameters[parameter], (int, float)):
+                if not isinstance(tool_parameters[parameter], int | float):
                     raise ToolParameterValidationError(f'parameter {parameter} should be number')
                 
                 if parameter_schema.min is not None and tool_parameters[parameter] < parameter_schema.min:
@@ -206,7 +208,7 @@ class BuiltinToolProviderController(ToolProviderController):
 
                 tool_parameters[parameter] = default_value
 
-    def validate_credentials_format(self, credentials: Dict[str, Any]) -> None:
+    def validate_credentials_format(self, credentials: dict[str, Any]) -> None:
         """
             validate the format of the credentials of the provider and set the default value if needed
 
@@ -216,7 +218,7 @@ class BuiltinToolProviderController(ToolProviderController):
         if credentials_schema is None:
             return
         
-        credentials_need_to_validate: Dict[str, ToolProviderCredentials] = {}
+        credentials_need_to_validate: dict[str, ToolProviderCredentials] = {}
         for credential_name in credentials_schema:
             credentials_need_to_validate[credential_name] = credentials_schema[credential_name]
 
@@ -241,8 +243,27 @@ class BuiltinToolProviderController(ToolProviderController):
                 
                 if credentials[credential_name] not in [x.value for x in options]:
                     raise ToolProviderCredentialValidationError(f'credential {credential_schema.label.en_US} should be one of {options}')
-            
-            if credentials[credential_name]:
+            elif credential_schema.type == ToolProviderCredentials.CredentialsType.BOOLEAN:
+                if isinstance(credentials[credential_name], bool):
+                    pass
+                elif isinstance(credentials[credential_name], str):
+                    if credentials[credential_name].lower() == 'true':
+                        credentials[credential_name] = True
+                    elif credentials[credential_name].lower() == 'false':
+                        credentials[credential_name] = False
+                    else:
+                        raise ToolProviderCredentialValidationError(f'credential {credential_schema.label.en_US} should be boolean')
+                elif isinstance(credentials[credential_name], int):
+                    if credentials[credential_name] == 1:
+                        credentials[credential_name] = True
+                    elif credentials[credential_name] == 0:
+                        credentials[credential_name] = False
+                    else:
+                        raise ToolProviderCredentialValidationError(f'credential {credential_schema.label.en_US} should be boolean')
+                else:
+                    raise ToolProviderCredentialValidationError(f'credential {credential_schema.label.en_US} should be boolean')
+
+            if credentials[credential_name] or credentials[credential_name] == False:
                 credentials_need_to_validate.pop(credential_name)
 
         for credential_name in credentials_need_to_validate:
@@ -261,7 +282,7 @@ class BuiltinToolProviderController(ToolProviderController):
 
                 credentials[credential_name] = default_value
     
-    def validate_credentials(self, credentials: Dict[str, Any]) -> None:
+    def validate_credentials(self, credentials: dict[str, Any]) -> None:
         """
             validate the credentials of the provider
 
@@ -275,7 +296,7 @@ class BuiltinToolProviderController(ToolProviderController):
         self._validate_credentials(credentials)
 
     @abstractmethod
-    def _validate_credentials(self, credentials: Dict[str, Any]) -> None:
+    def _validate_credentials(self, credentials: dict[str, Any]) -> None:
         """
             validate the credentials of the provider
 

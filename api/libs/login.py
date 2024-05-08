@@ -1,13 +1,14 @@
 import os
 from functools import wraps
 
-from extensions.ext_database import db
-from flask import current_app, g, has_request_context, request, session
+from flask import current_app, g, has_request_context, request
 from flask_login import user_logged_in
 from flask_login.config import EXEMPT_METHODS
-from models.account import Account, Tenant, TenantAccountJoin
 from werkzeug.exceptions import Unauthorized
 from werkzeug.local import LocalProxy
+
+from extensions.ext_database import db
+from models.account import Account, Tenant, TenantAccountJoin
 
 #: A proxy for the current user. If no user is logged in, this will be an
 #: anonymous user
@@ -52,7 +53,7 @@ def login_required(func):
     def decorated_view(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
         admin_api_key_enable = os.getenv('ADMIN_API_KEY_ENABLE', default='False')
-        if admin_api_key_enable:
+        if admin_api_key_enable.lower() == 'true':
             if auth_header:
                 if ' ' not in auth_header:
                     raise Unauthorized('Invalid Authorization header format. Expected \'Bearer <api-key>\' format.')

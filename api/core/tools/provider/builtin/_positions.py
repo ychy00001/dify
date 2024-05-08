@@ -1,31 +1,23 @@
-from typing import List
+import os.path
 
 from core.tools.entities.user_entities import UserToolProvider
-
-position = {
-    'google': 1,
-    'bing': 2,
-    'wikipedia': 2,
-    'dalle': 3,
-    'webscraper': 4,
-    'wolframalpha': 5,
-    'chart': 6,
-    'time': 7,
-    'yahoo': 8,
-    'stablediffusion': 9,
-    'vectorizer': 10,
-    'youtube': 11,
-    'github': 12,
-    'gaode': 13
-}
+from core.utils.position_helper import get_position_map, sort_by_position_map
 
 
 class BuiltinToolProviderSort:
-    @staticmethod
-    def sort(providers: List[UserToolProvider]) -> List[UserToolProvider]:
-        def sort_compare(provider: UserToolProvider) -> int:
-            return position.get(provider.name, 10000)
-        
-        sorted_providers = sorted(providers, key=sort_compare)
+    _position = {}
+
+    @classmethod
+    def sort(cls, providers: list[UserToolProvider]) -> list[UserToolProvider]:
+        if not cls._position:
+            cls._position = get_position_map(os.path.join(os.path.dirname(__file__), '..'))
+
+        def name_func(provider: UserToolProvider) -> str:
+            if provider.type == UserToolProvider.ProviderType.MODEL:
+                return f'model.{provider.name}'
+            else:
+                return provider.name
+
+        sorted_providers = sort_by_position_map(cls._position, providers, name_func)
 
         return sorted_providers

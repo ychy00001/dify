@@ -1,20 +1,21 @@
 import datetime
 import logging
 import time
-from typing import List, Optional
+from typing import Optional
 
 import click
 from celery import shared_task
-from core.index.index import IndexBuilder
+from werkzeug.exceptions import NotFound
+
+from core.rag.index_processor.index_processor_factory import IndexProcessorFactory
+from core.rag.models.document import Document
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
-from langchain.schema import Document
 from models.dataset import DocumentSegment
-from werkzeug.exceptions import NotFound
 
 
 @shared_task(queue='dataset')
-def create_segment_to_index_task(segment_id: str, keywords: Optional[List[str]] = None):
+def create_segment_to_index_task(segment_id: str, keywords: Optional[list[str]] = None):
     """
     Async create segment to index
     :param segment_id:
@@ -37,7 +38,7 @@ def create_segment_to_index_task(segment_id: str, keywords: Optional[List[str]] 
         # update segment status to indexing
         update_params = {
             DocumentSegment.status: "indexing",
-            DocumentSegment.indexing_at: datetime.datetime.utcnow()
+            DocumentSegment.indexing_at: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         }
         DocumentSegment.query.filter_by(id=segment.id).update(update_params)
         db.session.commit()
@@ -67,23 +68,14 @@ def create_segment_to_index_task(segment_id: str, keywords: Optional[List[str]] 
             logging.info(click.style('Segment {} document status is invalid, pass.'.format(segment.id), fg='cyan'))
             return
 
-        # save vector index
-        index = IndexBuilder.get_index(dataset, 'high_quality')
-        if index:
-            index.add_texts([document], duplicate_check=True)
-
-        # save keyword index
-        index = IndexBuilder.get_index(dataset, 'economy')
-        if index:
-            if keywords and len(keywords) > 0:
-                index.create_segment_keywords(segment.index_node_id, keywords)
-            else:
-                index.add_texts([document])
+        index_type = dataset.doc_form
+        index_processor = IndexProcessorFactory(index_type).init_index_processor()
+        index_processor.load(dataset, [document])
 
         # update segment to completed
         update_params = {
             DocumentSegment.status: "completed",
-            DocumentSegment.completed_at: datetime.datetime.utcnow()
+            DocumentSegment.completed_at: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         }
         DocumentSegment.query.filter_by(id=segment.id).update(update_params)
         db.session.commit()
@@ -93,7 +85,7 @@ def create_segment_to_index_task(segment_id: str, keywords: Optional[List[str]] 
     except Exception as e:
         logging.exception("create segment to index failed")
         segment.enabled = False
-        segment.disabled_at = datetime.datetime.utcnow()
+        segment.disabled_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         segment.status = 'error'
         segment.error = str(e)
         db.session.commit()

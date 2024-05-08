@@ -76,7 +76,7 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
       targetCode={`curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/create_by_text' \\\n--header 'Authorization: Bearer {api_key}' \\\n--header 'Content-Type: application/json' \\\n--data-raw '{"name": "text","text": "text","indexing_technique": "high_quality","process_rule": {"mode": "automatic"}}'`}
     >
     ```bash {{ title: 'cURL' }}
-    curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/create_by_text' \
+    curl --location --request --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/create_by_text' \
     --header 'Authorization: Bearer {api_key}' \
     --header 'Content-Type: application/json' \
     --data-raw '{
@@ -178,10 +178,10 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
       title="Request"
       tag="POST"
       label="/datasets/{dataset_id}/document/create_by_file"
-      targetCode={`curl --location POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/create_by_file' \\\n--header 'Authorization: Bearer {api_key}' \\\n--form 'data="{"indexing_technique":"high_quality","process_rule":{"rules":{"pre_processing_rules":[{"id":"remove_extra_spaces","enabled":true},{"id":"remove_urls_emails","enabled":true}],"segmentation":{"separator":"###","max_tokens":500}},"mode":"custom"}}";type=text/plain' \\\n--form 'file=@"/path/to/file"'`}
+      targetCode={`curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/create_by_file' \\\n--header 'Authorization: Bearer {api_key}' \\\n--form 'data="{"indexing_technique":"high_quality","process_rule":{"rules":{"pre_processing_rules":[{"id":"remove_extra_spaces","enabled":true},{"id":"remove_urls_emails","enabled":true}],"segmentation":{"separator":"###","max_tokens":500}},"mode":"custom"}}";type=text/plain' \\\n--form 'file=@"/path/to/file"'`}
     >
     ```bash {{ title: 'cURL' }}
-    curl --location POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/create_by_file' \
+    curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/create_by_file' \
     --header 'Authorization: Bearer {api_key}' \
     --form 'data="{\"name\":\"Dify\",\"indexing_technique\":\"high_quality\",\"process_rule\":{\"rules\":{\"pre_processing_rules\":[{\"id\":\"remove_extra_spaces\",\"enabled\":true},{\"id\":\"remove_urls_emails\",\"enabled\":true}],\"segmentation\":{\"separator\":\"###\",\"max_tokens\":500}},\"mode\":\"custom\"}}";type=text/plain' \
     --form 'file=@"/path/to/file"'
@@ -491,10 +491,10 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
       title="Request"
       tag="POST"
       label="/datasets/{dataset_id}/documents/{document_id}/update_by_file"
-      targetCode={`curl --location POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/{document_id}/create_by_file' \\\n--header 'Authorization: Bearer {api_key}' \\\n--form 'data="{"name":"Dify","indexing_technique":"high_quality","process_rule":{"rules":{"pre_processing_rules":[{"id":"remove_extra_spaces","enabled":true},{"id":"remove_urls_emails","enabled":true}],"segmentation":{"separator":"###","max_tokens":500}},"mode":"custom"}}";type=text/plain' \\\n--form 'file=@"/path/to/file"'`}
+      targetCode={`curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/documents/{document_id}/update_by_file' \\\n--header 'Authorization: Bearer {api_key}' \\\n--form 'data="{"name":"Dify","indexing_technique":"high_quality","process_rule":{"rules":{"pre_processing_rules":[{"id":"remove_extra_spaces","enabled":true},{"id":"remove_urls_emails","enabled":true}],"segmentation":{"separator":"###","max_tokens":500}},"mode":"custom"}}";type=text/plain' \\\n--form 'file=@"/path/to/file"'`}
     >
     ```bash {{ title: 'cURL' }}
-    curl --location POST '${props.apiBaseUrl}/datasets/{dataset_id}/document/{document_id}/create_by_file' \
+    curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/documents/{document_id}/update_by_file' \
     --header 'Authorization: Bearer {api_key}' \
     --form 'data="{\"name\":\"Dify\",\"indexing_technique\":\"high_quality\",\"process_rule\":{\"rules\":{\"pre_processing_rules\":[{\"id\":\"remove_extra_spaces\",\"enabled\":true},{\"id\":\"remove_urls_emails\",\"enabled\":true}],\"segmentation\":{\"separator\":\"###\",\"max_tokens\":500}},\"mode\":\"custom\"}}";type=text/plain' \
     --form 'file=@"/path/to/file"'
@@ -873,7 +873,7 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
 ---
 
 <Heading
-  url='/datasets/{dataset_id}/segments/{segment_id}'
+  url='/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}'
   method='DELETE'
   title='删除文档分段'
   name='#delete_segment'
@@ -894,7 +894,7 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
     <CodeGroup
       title="Request"
       tag="DELETE"
-      label="/datasets/{dataset_id}/segments/{segment_id}"
+      label="/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}"
       targetCode={`curl --location --request DELETE '${props.apiBaseUrl}/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}' \\\n--header 'Authorization: Bearer {api_key}' \\\n--header 'Content-Type: application/json'`}
     >
     ```bash {{ title: 'cURL' }}
@@ -916,7 +916,7 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
 ---
 
 <Heading
-  url='/datasets/{dataset_id}/segments/{segment_id}'
+  url='/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}'
   method='POST'
   title='更新文档分段'
   name='#update_segment'
@@ -935,7 +935,7 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
 
     ### Request Body
     <Properties>
-      <Property name='segments' type='object list' key='segments'>
+      <Property name='segment' type='object list' key='segment'>
         - <code>content</code> (text) 文本内容/问题内容，必填
         - <code>answer</code> (text) 答案内容，非必填，如果知识库的模式为qa模式则传值
         - <code>keywords</code> (list) 关键字，非必填
@@ -947,15 +947,15 @@ import { Row, Col, Properties, Property, Heading, SubProperty, Paragraph } from 
     <CodeGroup
       title="Request"
       tag="POST"
-      label="/datasets/{dataset_id}/segments/{segment_id}"
-      targetCode={`curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}' \\\n--header 'Authorization: Bearer {api_key}' \\\n--header 'Content-Type: application/json'\\\n--data-raw '{\"segments\": {\"content\": \"1\",\"answer\": \"1\", \"keywords\": [\"a\"], \"enabled\": false}}'`}
+      label="/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}"
+      targetCode={`curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}' \\\n--header 'Authorization: Bearer {api_key}' \\\n--header 'Content-Type: application/json'\\\n--data-raw '{\"segment\": {\"content\": \"1\",\"answer\": \"1\", \"keywords\": [\"a\"], \"enabled\": false}}'`}
     >
     ```bash {{ title: 'cURL' }}
     curl --location --request POST '${props.apiBaseUrl}/datasets/{dataset_id}/documents/{document_id}/segments/{segment_id}' \
     --header 'Authorization: Bearer {api_key}' \
     --header 'Content-Type: application/json' \
     --data-raw '{
-      "segments": {
+      "segment": {
           "content": "1",
           "answer": "1",
           "keywords": ["a"],

@@ -2,16 +2,13 @@
 
 set -e
 
-cd /app/api
-pip install --prefix=/pkg -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-
 if [[ "${MIGRATION_ENABLED}" == "true" ]]; then
   echo "Running migrations"
   flask db upgrade
 fi
 
 if [[ "${MODE}" == "worker" ]]; then
-  celery -A app.celery worker -P ${CELERY_WORKER_CLASS:-gevent} -c ${CELERY_WORKER_AMOUNT:-1} --loglevel DEBUG \
+  celery -A app.celery worker -P ${CELERY_WORKER_CLASS:-gevent} -c ${CELERY_WORKER_AMOUNT:-1} --loglevel INFO \
     -Q ${CELERY_QUEUES:-dataset,generation,mail}
 elif [[ "${MODE}" == "beat" ]]; then
   celery -A app.celery beat --loglevel INFO

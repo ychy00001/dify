@@ -1,8 +1,8 @@
 export type FormValue = Record<string, any>
 
 export type TypeWithI18N<T = string> = {
-  'en_US': T
-  'zh_Hans': T
+  en_US: T
+  zh_Hans: T
   [key: string]: T
 }
 
@@ -98,6 +98,7 @@ export type CredentialFormSchemaBase = {
   default?: string
   tooltip?: TypeWithI18N
   show_on: FormShowOnObject[]
+  url?: string
 }
 
 export type CredentialFormSchemaTextInput = CredentialFormSchemaBase & { max_length?: number; placeholder?: TypeWithI18N }

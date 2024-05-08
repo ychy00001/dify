@@ -36,17 +36,21 @@ const ChatWrapper = () => {
     return {
       ...config,
       supportFeedback: true,
+      opening_statement: currentConversationId ? currentConversationItem?.introduction : (config as any).opening_statement,
     } as ChatConfig
-  }, [appParams])
+  }, [appParams, currentConversationItem?.introduction, currentConversationId])
   const {
     chatList,
     handleSend,
     handleStop,
-    isResponsing,
+    isResponding,
     suggestedQuestions,
   } = useChat(
     appConfig,
-    undefined,
+    {
+      inputs: (currentConversationId ? currentConversationItem?.inputs : newConversationInputs) as any,
+      promptVariables: inputsForms,
+    },
     appPrevChatList,
     taskId => stopChatMessageResponding('', taskId, isInstalledApp, appId),
   )
@@ -126,7 +130,7 @@ const ChatWrapper = () => {
     <Chat
       config={appConfig}
       chatList={chatList}
-      isResponsing={isResponsing}
+      isResponding={isResponding}
       chatContainerInnerClassName={`mx-auto pt-6 w-full max-w-[720px] ${isMobile && 'px-4'}`}
       chatFooterClassName='pb-4'
       chatFooterInnerClassName={`mx-auto w-full max-w-[720px] ${isMobile && 'px-4'}`}

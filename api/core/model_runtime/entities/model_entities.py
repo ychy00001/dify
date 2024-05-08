@@ -2,8 +2,9 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Optional
 
-from core.model_runtime.entities.common_entities import I18nObject
 from pydantic import BaseModel
+
+from core.model_runtime.entities.common_entities import I18nObject
 
 
 class ModelType(Enum):
@@ -16,7 +17,7 @@ class ModelType(Enum):
     SPEECH2TEXT = "speech2text"
     MODERATION = "moderation"
     TTS = "tts"
-    # TEXT2IMG = "text2img"
+    TEXT2IMG = "text2img"
 
     @classmethod
     def value_of(cls, origin_model_type: str) -> "ModelType":
@@ -35,6 +36,8 @@ class ModelType(Enum):
             return cls.SPEECH2TEXT
         elif origin_model_type == 'tts' or origin_model_type == cls.TTS.value:
             return cls.TTS
+        elif origin_model_type == 'text2img' or origin_model_type == cls.TEXT2IMG.value:
+            return cls.TEXT2IMG
         elif origin_model_type == cls.MODERATION.value:
             return cls.MODERATION
         else:
@@ -58,9 +61,10 @@ class ModelType(Enum):
             return 'tts'
         elif self == self.MODERATION:
             return 'moderation'
+        elif self == self.TEXT2IMG:
+            return 'text2img'
         else:
             raise ValueError(f'invalid model type {self}')
-
 
 class FetchFrom(Enum):
     """
@@ -90,6 +94,7 @@ class DefaultParameterName(Enum):
     PRESENCE_PENALTY = "presence_penalty"
     FREQUENCY_PENALTY = "frequency_penalty"
     MAX_TOKENS = "max_tokens"
+    RESPONSE_FORMAT = "response_format"
 
     @classmethod
     def value_of(cls, value: Any) -> 'DefaultParameterName':
@@ -126,8 +131,9 @@ class ModelPropertyKey(Enum):
     SUPPORTED_FILE_EXTENSIONS = "supported_file_extensions"
     MAX_CHARACTERS_PER_CHUNK = "max_characters_per_chunk"
     DEFAULT_VOICE = "default_voice"
+    VOICES = "voices"
     WORD_LIMIT = "word_limit"
-    AUDOI_TYPE = "audio_type"
+    AUDIO_TYPE = "audio_type"
     MAX_WORKERS = "max_workers"
 
 

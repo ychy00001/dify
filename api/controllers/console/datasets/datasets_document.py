@@ -1,36 +1,53 @@
-# -*- coding:utf-8 -*-
-from datetime import datetime
-from typing import List
+import logging
+from datetime import datetime, timezone
+
+from flask import request
+from flask_login import current_user
+from flask_restful import Resource, fields, marshal, marshal_with, reqparse
+from sqlalchemy import asc, desc
+from werkzeug.exceptions import Forbidden, NotFound
 
 import services
 from controllers.console import api
-from controllers.console.app.error import (ProviderModelCurrentlyNotSupportError, ProviderNotInitializeError,
-                                           ProviderQuotaExceededError)
-from controllers.console.datasets.error import (ArchivedDocumentImmutableError, DocumentAlreadyFinishedError,
-                                                DocumentIndexingError, InvalidActionError, InvalidMetadataError)
+from controllers.console.app.error import (
+    ProviderModelCurrentlyNotSupportError,
+    ProviderNotInitializeError,
+    ProviderQuotaExceededError,
+)
+from controllers.console.datasets.error import (
+    ArchivedDocumentImmutableError,
+    DocumentAlreadyFinishedError,
+    DocumentIndexingError,
+    InvalidActionError,
+    InvalidMetadataError,
+)
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required, cloud_edition_billing_resource_check
-from core.errors.error import (LLMBadRequestError, ModelCurrentlyNotSupportError, ProviderTokenNotInitError,
-                               QuotaExceededError)
+from core.errors.error import (
+    LLMBadRequestError,
+    ModelCurrentlyNotSupportError,
+    ProviderTokenNotInitError,
+    QuotaExceededError,
+)
 from core.indexing_runner import IndexingRunner
 from core.model_manager import ModelManager
 from core.model_runtime.entities.model_entities import ModelType
 from core.model_runtime.errors.invoke import InvokeAuthorizationError
+from core.rag.extractor.entity.extract_setting import ExtractSetting
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
-from fields.document_fields import (dataset_and_document_fields, document_fields, document_status_fields,
-                                    document_with_segments_fields)
-from flask import request
-from flask_login import current_user
-from flask_restful import Resource, fields, marshal, marshal_with, reqparse
+from fields.document_fields import (
+    dataset_and_document_fields,
+    document_fields,
+    document_status_fields,
+    document_with_segments_fields,
+)
 from libs.login import login_required
 from models.dataset import Dataset, DatasetProcessRule, Document, DocumentSegment
 from models.model import UploadFile
 from services.dataset_service import DatasetService, DocumentService
-from sqlalchemy import asc, desc
 from tasks.add_document_to_index_task import add_document_to_index_task
 from tasks.remove_document_from_index_task import remove_document_from_index_task
-from werkzeug.exceptions import Forbidden, NotFound
 
 
 class DocumentResource(Resource):
@@ -54,7 +71,7 @@ class DocumentResource(Resource):
 
         return document
 
-    def get_batch_documents(self, dataset_id: str, batch: str) -> List[Document]:
+    def get_batch_documents(self, dataset_id: str, batch: str) -> list[Document]:
         dataset = DatasetService.get_dataset(dataset_id)
         if not dataset:
             raise NotFound('Dataset not found.')
@@ -80,7 +97,7 @@ class GetProcessRuleApi(Resource):
         req_data = request.args
 
         document_id = req_data.get('document_id')
-        
+
         # get default rules
         mode = DocumentService.DEFAULT_RULES['mode']
         rules = DocumentService.DEFAULT_RULES['rules']
@@ -217,7 +234,7 @@ class DatasetDocumentListApi(Resource):
                             location='json')
         parser.add_argument('data_source', type=dict, required=False, location='json')
         parser.add_argument('process_rule', type=dict, required=False, location='json')
-        parser.add_argument('duplicate', type=bool, nullable=False, location='json')
+        parser.add_argument('duplicate', type=bool, default=True, nullable=False, location='json')
         parser.add_argument('original_document_id', type=str, required=False, location='json')
         parser.add_argument('doc_form', type=str, default='text_model', required=False, nullable=False, location='json')
         parser.add_argument('doc_language', type=str, default='English', required=False, nullable=False,
@@ -279,8 +296,8 @@ class DatasetInitApi(Resource):
                 )
             except InvokeAuthorizationError:
                 raise ProviderNotInitializeError(
-                    f"No Embedding Model available. Please configure a valid provider "
-                    f"in the Settings -> Model Provider.")
+                    "No Embedding Model available. Please configure a valid provider "
+                    "in the Settings -> Model Provider.")
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
 
@@ -347,16 +364,22 @@ class DocumentIndexingEstimateApi(DocumentResource):
                 if not file:
                     raise NotFound('File not found.')
 
+                extract_setting = ExtractSetting(
+                    datasource_type="upload_file",
+                    upload_file=file,
+                    document_model=document.doc_form
+                )
+
                 indexing_runner = IndexingRunner()
 
                 try:
-                    response = indexing_runner.file_indexing_estimate(current_user.current_tenant_id, [file],
-                                                                      data_process_rule_dict, None,
-                                                                      'English', dataset_id)
+                    response = indexing_runner.indexing_estimate(current_user.current_tenant_id, [extract_setting],
+                                                                 data_process_rule_dict, document.doc_form,
+                                                                 'English', dataset_id)
                 except LLMBadRequestError:
                     raise ProviderNotInitializeError(
-                        f"No Embedding Model available. Please configure a valid provider "
-                        f"in the Settings -> Model Provider.")
+                        "No Embedding Model available. Please configure a valid provider "
+                        "in the Settings -> Model Provider.")
                 except ProviderTokenNotInitError as ex:
                     raise ProviderNotInitializeError(ex.description)
 
@@ -371,9 +394,6 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
     def get(self, dataset_id, batch):
         dataset_id = str(dataset_id)
         batch = str(batch)
-        dataset = DatasetService.get_dataset(dataset_id)
-        if dataset is None:
-            raise NotFound("Dataset not found.")
         documents = self.get_batch_documents(dataset_id, batch)
         response = {
             "tokens": 0,
@@ -387,6 +407,7 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
         data_process_rule = documents[0].dataset_process_rule
         data_process_rule_dict = data_process_rule.to_dict()
         info_list = []
+        extract_settings = []
         for document in documents:
             if document.indexing_status in ['completed', 'error']:
                 raise DocumentAlreadyFinishedError()
@@ -409,42 +430,49 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
                 }
                 info_list.append(notion_info)
 
-        if dataset.data_source_type == 'upload_file':
-            file_details = db.session.query(UploadFile).filter(
-                UploadFile.tenant_id == current_user.current_tenant_id,
-                UploadFile.id.in_(info_list)
-            ).all()
+            if document.data_source_type == 'upload_file':
+                file_id = data_source_info['upload_file_id']
+                file_detail = db.session.query(UploadFile).filter(
+                    UploadFile.tenant_id == current_user.current_tenant_id,
+                    UploadFile.id == file_id
+                ).first()
 
-            if file_details is None:
-                raise NotFound("File not found.")
+                if file_detail is None:
+                    raise NotFound("File not found.")
 
+                extract_setting = ExtractSetting(
+                    datasource_type="upload_file",
+                    upload_file=file_detail,
+                    document_model=document.doc_form
+                )
+                extract_settings.append(extract_setting)
+
+            elif document.data_source_type == 'notion_import':
+                extract_setting = ExtractSetting(
+                    datasource_type="notion_import",
+                    notion_info={
+                        "notion_workspace_id": data_source_info['notion_workspace_id'],
+                        "notion_obj_id": data_source_info['notion_page_id'],
+                        "notion_page_type": data_source_info['type'],
+                        "tenant_id": current_user.current_tenant_id
+                    },
+                    document_model=document.doc_form
+                )
+                extract_settings.append(extract_setting)
+
+            else:
+                raise ValueError('Data source type not support')
             indexing_runner = IndexingRunner()
             try:
-                response = indexing_runner.file_indexing_estimate(current_user.current_tenant_id, file_details,
-                                                                  data_process_rule_dict, None,
-                                                                  'English', dataset_id)
+                response = indexing_runner.indexing_estimate(current_user.current_tenant_id, extract_settings,
+                                                             data_process_rule_dict, document.doc_form,
+                                                             'English', dataset_id)
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
-                    f"No Embedding Model available. Please configure a valid provider "
-                    f"in the Settings -> Model Provider.")
+                    "No Embedding Model available. Please configure a valid provider "
+                    "in the Settings -> Model Provider.")
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
-        elif dataset.data_source_type == 'notion_import':
-
-            indexing_runner = IndexingRunner()
-            try:
-                response = indexing_runner.notion_indexing_estimate(current_user.current_tenant_id,
-                                                                    info_list,
-                                                                    data_process_rule_dict,
-                                                                    None, 'English', dataset_id)
-            except LLMBadRequestError:
-                raise ProviderNotInitializeError(
-                    f"No Embedding Model available. Please configure a valid provider "
-                    f"in the Settings -> Model Provider.")
-            except ProviderTokenNotInitError as ex:
-                raise ProviderNotInitializeError(ex.description)
-        else:
-            raise ValueError('Data source type not support')
         return response
 
 
@@ -607,7 +635,7 @@ class DocumentProcessingApi(DocumentResource):
                 raise InvalidActionError('Document not in indexing state.')
 
             document.paused_by = current_user.id
-            document.paused_at = datetime.utcnow()
+            document.paused_at = datetime.now(timezone.utc).replace(tzinfo=None)
             document.is_paused = True
             db.session.commit()
 
@@ -687,7 +715,7 @@ class DocumentMetadataApi(DocumentResource):
                     document.doc_metadata[key] = value
 
         document.doc_type = doc_type
-        document.updated_at = datetime.utcnow()
+        document.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
 
         return {'result': 'success', 'message': 'Document metadata updated.'}, 200
@@ -725,7 +753,7 @@ class DocumentStatusApi(DocumentResource):
             document.enabled = True
             document.disabled_at = None
             document.disabled_by = None
-            document.updated_at = datetime.utcnow()
+            document.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
             # Set cache to prevent indexing the same document multiple times
@@ -742,9 +770,9 @@ class DocumentStatusApi(DocumentResource):
                 raise InvalidActionError('Document already disabled.')
 
             document.enabled = False
-            document.disabled_at = datetime.utcnow()
+            document.disabled_at = datetime.now(timezone.utc).replace(tzinfo=None)
             document.disabled_by = current_user.id
-            document.updated_at = datetime.utcnow()
+            document.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
             # Set cache to prevent indexing the same document multiple times
@@ -759,9 +787,9 @@ class DocumentStatusApi(DocumentResource):
                 raise InvalidActionError('Document already archived.')
 
             document.archived = True
-            document.archived_at = datetime.utcnow()
+            document.archived_at = datetime.now(timezone.utc).replace(tzinfo=None)
             document.archived_by = current_user.id
-            document.updated_at = datetime.utcnow()
+            document.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
             if document.enabled:
@@ -778,7 +806,7 @@ class DocumentStatusApi(DocumentResource):
             document.archived = False
             document.archived_at = None
             document.archived_by = None
-            document.updated_at = datetime.utcnow()
+            document.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
             # Set cache to prevent indexing the same document multiple times
@@ -853,6 +881,49 @@ class DocumentRecoverApi(DocumentResource):
         return {'result': 'success'}, 204
 
 
+class DocumentRetryApi(DocumentResource):
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def post(self, dataset_id):
+        """retry document."""
+
+        parser = reqparse.RequestParser()
+        parser.add_argument('document_ids', type=list, required=True, nullable=False,
+                            location='json')
+        args = parser.parse_args()
+        dataset_id = str(dataset_id)
+        dataset = DatasetService.get_dataset(dataset_id)
+        retry_documents = []
+        if not dataset:
+            raise NotFound('Dataset not found.')
+        for document_id in args['document_ids']:
+            try:
+                document_id = str(document_id)
+
+                document = DocumentService.get_document(dataset.id, document_id)
+
+                # 404 if document not found
+                if document is None:
+                    raise NotFound("Document Not Exists.")
+
+                # 403 if document is archived
+                if DocumentService.check_archived(document):
+                    raise ArchivedDocumentImmutableError()
+
+                # 400 if document is completed
+                if document.indexing_status == 'completed':
+                    raise DocumentAlreadyFinishedError()
+                retry_documents.append(document)
+            except Exception as e:
+                logging.error(f"Document {document_id} retry failed: {str(e)}")
+                continue
+        # retry document
+        DocumentService.retry_document(dataset_id, retry_documents)
+
+        return {'result': 'success'}, 204
+
+
 api.add_resource(GetProcessRuleApi, '/datasets/process-rule')
 api.add_resource(DatasetDocumentListApi,
                  '/datasets/<uuid:dataset_id>/documents')
@@ -878,3 +949,4 @@ api.add_resource(DocumentStatusApi,
                  '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/status/<string:action>')
 api.add_resource(DocumentPauseApi, '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/processing/pause')
 api.add_resource(DocumentRecoverApi, '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/processing/resume')
+api.add_resource(DocumentRetryApi, '/datasets/<uuid:dataset_id>/retry')

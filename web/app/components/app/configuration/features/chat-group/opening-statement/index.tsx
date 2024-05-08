@@ -18,7 +18,7 @@ import { getNewVar } from '@/utils/var'
 import { varHighlightHTML } from '@/app/components/app/configuration/base/var-highlight'
 import { Plus, Trash03 } from '@/app/components/base/icons/src/vender/line/general'
 
-const MAX_QUESTION_NUM = 3
+const MAX_QUESTION_NUM = 5
 
 export type IOpeningStatementProps = {
   value: string
@@ -135,7 +135,7 @@ const OpeningStatement: FC<IOpeningStatementProps> = ({
         <Button className='!h-8 !px-3 text-xs' onClick={handleConfirm} type="primary">{t('common.operation.save')}</Button>
       </div>
     ) : (
-      <OperationBtn type='edit' actionName={hasValue ? '' : t('appDebug.openingStatement.writeOpner') as string} onClick={handleEdit} />
+      <OperationBtn type='edit' actionName={hasValue ? '' : t('appDebug.openingStatement.writeOpener') as string} onClick={handleEdit} />
     )
   ) : null
 

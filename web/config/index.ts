@@ -1,5 +1,7 @@
 /* eslint-disable import/no-mutable-exports */
+import { InputVarType } from '@/app/components/workflow/types'
 import { AgentStrategy } from '@/types/app'
+import { PromptRole } from '@/models/debug'
 
 export let apiPrefix = ''
 export let publicApiPrefix = ''
@@ -69,7 +71,12 @@ export const TONE_LIST = [
 ]
 
 export const DEFAULT_CHAT_PROMPT_CONFIG = {
-  prompt: [],
+  prompt: [
+    {
+      role: PromptRole.system,
+      text: '',
+    },
+  ],
 }
 
 export const DEFAULT_COMPLETION_PROMPT_CONFIG = {
@@ -115,6 +122,15 @@ export const VAR_ITEM_TEMPLATE = {
   required: true,
 }
 
+export const VAR_ITEM_TEMPLATE_IN_WORKFLOW = {
+  variable: '',
+  label: '',
+  type: InputVarType.textInput,
+  max_length: DEFAULT_VALUE_MAX_LEN,
+  required: true,
+  options: [],
+}
+
 export const appDefaultIconBackground = '#D5F5F6'
 
 export const NEED_REFRESH_APP_LIST_KEY = 'needRefreshAppList'
@@ -130,7 +146,7 @@ export const ANNOTATION_DEFAULT = {
   score_threshold: 0.9,
 }
 
-export const MAX_TOOLS_NUM = 5
+export const MAX_TOOLS_NUM = 10
 
 export const DEFAULT_AGENT_SETTING = {
   enabled: false,
@@ -225,3 +241,5 @@ Question: {{query}}
 Thought: {{agent_scratchpad}}
   `,
 }
+
+export const VAR_REGEX = /\{\{(#[a-zA-Z0-9_-]{1,50}(\.[a-zA-Z_][a-zA-Z0-9_]{0,29}){1,10}#)\}\}/gi

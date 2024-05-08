@@ -1,16 +1,18 @@
 import logging
 
+from flask_login import current_user
+from flask_restful import Resource, reqparse
+from werkzeug.exceptions import Forbidden
+
 from controllers.console import api
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
 from core.model_runtime.entities.model_entities import ModelType
 from core.model_runtime.errors.validate import CredentialsValidateFailedError
 from core.model_runtime.utils.encoders import jsonable_encoder
-from flask_login import current_user
-from flask_restful import Resource, reqparse
 from libs.login import login_required
+from models.account import TenantAccountRole
 from services.model_provider_service import ModelProviderService
-from werkzeug.exceptions import Forbidden
 
 
 class DefaultModelApi(Resource):
@@ -93,7 +95,7 @@ class ModelProviderModelApi(Resource):
     @login_required
     @account_initialization_required
     def post(self, provider: str):
-        if current_user.current_tenant.current_role not in ['admin', 'owner']:
+        if not TenantAccountRole.is_privileged_role(current_user.current_tenant.current_role):
             raise Forbidden()
 
         tenant_id = current_user.current_tenant_id
@@ -124,7 +126,7 @@ class ModelProviderModelApi(Resource):
     @login_required
     @account_initialization_required
     def delete(self, provider: str):
-        if current_user.current_tenant.current_role not in ['admin', 'owner']:
+        if not TenantAccountRole.is_privileged_role(current_user.current_tenant.current_role):
             raise Forbidden()
 
         tenant_id = current_user.current_tenant_id

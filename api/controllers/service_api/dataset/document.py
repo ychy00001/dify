@@ -1,29 +1,34 @@
 import json
 
+from flask import request
+from flask_restful import marshal, reqparse
+from sqlalchemy import desc
+from werkzeug.exceptions import NotFound
+
 import services.dataset_service
 from controllers.service_api import api
 from controllers.service_api.app.error import ProviderNotInitializeError
-from controllers.service_api.dataset.error import (ArchivedDocumentImmutableError, DocumentIndexingError,
-                                                   NoFileUploadedError, TooManyFilesError)
+from controllers.service_api.dataset.error import (
+    ArchivedDocumentImmutableError,
+    DocumentIndexingError,
+    NoFileUploadedError,
+    TooManyFilesError,
+)
 from controllers.service_api.wraps import DatasetApiResource, cloud_edition_billing_resource_check
 from core.errors.error import ProviderTokenNotInitError
 from extensions.ext_database import db
 from fields.document_fields import document_fields, document_status_fields
-from flask import request
-from flask_login import current_user
-from flask_restful import marshal, reqparse
 from libs.login import current_user
 from models.dataset import Dataset, Document, DocumentSegment
 from services.dataset_service import DocumentService
 from services.file_service import FileService
-from sqlalchemy import desc
-from werkzeug.exceptions import NotFound
 
 
 class DocumentAddByTextApi(DatasetApiResource):
     """Resource for documents."""
 
     @cloud_edition_billing_resource_check('vector_space', 'dataset')
+    @cloud_edition_billing_resource_check('documents', 'dataset')
     def post(self, tenant_id, dataset_id):
         """Create document by text."""
         parser = reqparse.RequestParser()
@@ -149,6 +154,7 @@ class DocumentUpdateByTextApi(DatasetApiResource):
 class DocumentAddByFileApi(DatasetApiResource):
     """Resource for documents."""
     @cloud_edition_billing_resource_check('vector_space', 'dataset')
+    @cloud_edition_billing_resource_check('documents', 'dataset')
     def post(self, tenant_id, dataset_id):
         """Create document by upload file."""
         args = {}
@@ -168,7 +174,7 @@ class DocumentAddByFileApi(DatasetApiResource):
 
         if not dataset:
             raise ValueError('Dataset is not exist.')
-        if not dataset.indexing_technique and not args['indexing_technique']:
+        if not dataset.indexing_technique and not args.get('indexing_technique'):
             raise ValueError('indexing_technique is required.')
 
         # save file info

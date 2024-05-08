@@ -1,13 +1,14 @@
 import json
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 
 import requests
+
 from core.tools.entities.tool_entities import ToolInvokeMessage
 from core.tools.tool.builtin_tool import BuiltinTool
 
 
 class GaodeRepositoriesTool(BuiltinTool):
-    def _invoke(self, user_id: str, tool_parameters: Dict[str, Any]) -> Union[ToolInvokeMessage, List[ToolInvokeMessage]]:
+    def _invoke(self, user_id: str, tool_parameters: dict[str, Any]) -> Union[ToolInvokeMessage, list[ToolInvokeMessage]]:
         """
             invoke tools
         """
@@ -53,4 +54,4 @@ class GaodeRepositoriesTool(BuiltinTool):
             s.close()
             return self.create_text_message(f'No weather information for {city} was found.')
         except Exception as e:
-            return self.create_text_message("Github API Key and Api Version is invalid. {}".format(e))
+            return self.create_text_message("Gaode API Key and Api Version is invalid. {}".format(e))

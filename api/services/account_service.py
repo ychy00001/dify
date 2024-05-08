@@ -1,39 +1,38 @@
-# -*- coding:utf-8 -*-
 import base64
-import json
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
-from typing import Any, Dict, Optional
+from typing import Any, Optional
+
+from flask import current_app
+from sqlalchemy import func
+from werkzeug.exceptions import Unauthorized
 
 from constants.languages import language_timezone_mapping, languages
 from events.tenant_event import tenant_was_created
 from extensions.ext_redis import redis_client
-from flask import current_app
 from libs.helper import get_remote_ip
 from libs.passport import PassportService
-from libs.password import compare_password, hash_password
+from libs.password import compare_password, hash_password, valid_password
 from libs.rsa import generate_key_pair
 from models.account import *
-from services.errors.account import (AccountAlreadyInTenantError, AccountLoginError, AccountNotLinkTenantError,
-                                     AccountRegisterError, CannotOperateSelfError, CurrentPasswordIncorrectError,
-                                     InvalidActionError, LinkAccountIntegrateError, MemberNotInTenantError,
-                                     NoPermissionError, RoleAlreadyAssignedError, TenantNotFound)
-from sqlalchemy import func
+from services.errors.account import (
+    AccountAlreadyInTenantError,
+    AccountLoginError,
+    AccountNotLinkTenantError,
+    AccountRegisterError,
+    CannotOperateSelfError,
+    CurrentPasswordIncorrectError,
+    InvalidActionError,
+    LinkAccountIntegrateError,
+    MemberNotInTenantError,
+    NoPermissionError,
+    RoleAlreadyAssignedError,
+    TenantNotFound,
+)
 from tasks.mail_invite_member_task import send_invite_member_mail_task
-from werkzeug.exceptions import Forbidden
-from sqlalchemy import exc
-
-
-def _create_tenant_for_account(account) -> Tenant:
-    tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
-
-    TenantService.create_tenant_member(tenant, account, role='owner')
-    account.current_tenant = tenant
-
-    return tenant
 
 
 class AccountService:
@@ -45,23 +44,23 @@ class AccountService:
             return None
 
         if account.status in [AccountStatus.BANNED.value, AccountStatus.CLOSED.value]:
-            raise Forbidden('Account is banned or closed.')
-        
-        # init owner's tenant
-        tenant_owner = TenantAccountJoin.query.filter_by(account_id=account.id, role='owner').first()
-        if not tenant_owner:
-            _create_tenant_for_account(account)
-        
+            raise Unauthorized("Account is banned or closed.")
+
         current_tenant = TenantAccountJoin.query.filter_by(account_id=account.id, current=True).first()
         if current_tenant:
             account.current_tenant_id = current_tenant.tenant_id
         else:
-            account.current_tenant_id = tenant_owner.tenant_id
-            tenant_owner.current = True
+            available_ta = TenantAccountJoin.query.filter_by(account_id=account.id) \
+                .order_by(TenantAccountJoin.id.asc()).first()
+            if not available_ta:
+                return None
+
+            account.current_tenant_id = available_ta.tenant_id
+            available_ta.current = True
             db.session.commit()
-       
-        if datetime.utcnow() - account.last_active_at > timedelta(minutes=10):
-            account.last_active_at = datetime.utcnow()
+
+        if datetime.now(timezone.utc).replace(tzinfo=None) - account.last_active_at > timedelta(minutes=10):
+            account.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
         return account
@@ -71,7 +70,7 @@ class AccountService:
     def get_account_jwt_token(account):
         payload = {
             "user_id": account.id,
-            "exp": datetime.utcnow() + timedelta(days=30),
+            "exp": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
             "iss": current_app.config['EDITION'],
             "sub": 'Console API Passport',
         }
@@ -92,7 +91,7 @@ class AccountService:
 
         if account.status == AccountStatus.PENDING.value:
             account.status = AccountStatus.ACTIVE.value
-            account.initialized_at = datetime.utcnow()
+            account.initialized_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
         if account.password is None or not compare_password(password, account.password, account.password_salt):
@@ -104,6 +103,9 @@ class AccountService:
         """update account password"""
         if account.password and not compare_password(password, account.password, account.password_salt):
             raise CurrentPasswordIncorrectError("Current password is incorrect.")
+
+        # may be raised
+        valid_password(new_password)
 
         # generate password salt
         salt = secrets.token_bytes(16)
@@ -141,9 +143,9 @@ class AccountService:
 
         account.interface_language = interface_language
         account.interface_theme = interface_theme
-        
+
         # Set timezone based on language
-        account.timezone = language_timezone_mapping.get(interface_language, 'UTC') 
+        account.timezone = language_timezone_mapping.get(interface_language, 'UTC')
 
         db.session.add(account)
         db.session.commit()
@@ -161,7 +163,7 @@ class AccountService:
                 # If it exists, update the record
                 account_integrate.open_id = open_id
                 account_integrate.encrypted_token = ""  # todo
-                account_integrate.updated_at = datetime.utcnow()
+                account_integrate.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             else:
                 # If it does not exist, create a new record
                 account_integrate = AccountIntegrate(account_id=account.id, provider=provider, open_id=open_id,
@@ -176,7 +178,7 @@ class AccountService:
 
     @staticmethod
     def close_account(account: Account) -> None:
-        """todo: Close account"""
+        """Close account"""
         account.status = AccountStatus.CLOSED.value
         db.session.commit()
 
@@ -195,7 +197,7 @@ class AccountService:
     @staticmethod
     def update_last_login(account: Account, request) -> None:
         """Update last login time and ip"""
-        account.last_login_at = datetime.utcnow()
+        account.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
         account.last_login_ip = get_remote_ip(request)
         db.session.add(account)
         db.session.commit()
@@ -217,6 +219,21 @@ class TenantService:
         return tenant
 
     @staticmethod
+    def create_owner_tenant_if_not_exist(account: Account):
+        """Create owner tenant if not exist"""
+        available_ta = TenantAccountJoin.query.filter_by(account_id=account.id) \
+            .order_by(TenantAccountJoin.id.asc()).first()
+
+        if available_ta:
+            return
+
+        tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
+        TenantService.create_tenant_member(tenant, account, role='owner')
+        account.current_tenant = tenant
+        db.session.commit()
+        tenant_was_created.send(tenant)
+
+    @staticmethod
     def create_tenant_member(tenant: Tenant, account: Account, role: str = 'normal') -> TenantAccountJoin:
         """Create tenant member"""
         if role == TenantAccountJoinRole.OWNER.value:
@@ -234,11 +251,11 @@ class TenantService:
         return ta
 
     @staticmethod
-    def get_join_tenants(account: Account) -> List[Tenant]:
+    def get_join_tenants(account: Account) -> list[Tenant]:
         """Get account join tenants"""
         return db.session.query(Tenant).join(
             TenantAccountJoin, Tenant.id == TenantAccountJoin.tenant_id
-        ).filter(TenantAccountJoin.account_id == account.id).all()
+        ).filter(TenantAccountJoin.account_id == account.id, Tenant.status == TenantStatus.NORMAL).all()
 
     @staticmethod
     def get_current_tenant_by_account(account: Account):
@@ -262,18 +279,23 @@ class TenantService:
         if tenant_id is None:
             raise ValueError("Tenant ID must be provided.")
 
-        tenant_account_join = TenantAccountJoin.query.filter_by(account_id=account.id, tenant_id=tenant_id).first()
+        tenant_account_join = db.session.query(TenantAccountJoin).join(Tenant, TenantAccountJoin.tenant_id == Tenant.id).filter(
+            TenantAccountJoin.account_id == account.id,
+            TenantAccountJoin.tenant_id == tenant_id,
+            Tenant.status == TenantStatus.NORMAL,
+        ).first()
+
         if not tenant_account_join:
             raise AccountNotLinkTenantError("Tenant not found or account is not a member of the tenant.")
-        else: 
+        else:
             TenantAccountJoin.query.filter(TenantAccountJoin.account_id == account.id, TenantAccountJoin.tenant_id != tenant_id).update({'current': False})
             tenant_account_join.current = True
-            db.session.commit()
             # Set the current tenant for the account
             account.current_tenant_id = tenant_account_join.tenant_id
+            db.session.commit()
 
     @staticmethod
-    def get_tenant_members(tenant: Tenant) -> List[Account]:
+    def get_tenant_members(tenant: Tenant) -> list[Account]:
         """Get tenant members"""
         query = (
             db.session.query(Account, TenantAccountJoin.role)
@@ -294,7 +316,7 @@ class TenantService:
         return updated_accounts
 
     @staticmethod
-    def has_roles(tenant: Tenant, roles: List[TenantAccountJoinRole]) -> bool:
+    def has_roles(tenant: Tenant, roles: list[TenantAccountJoinRole]) -> bool:
         """Check if user has any of the given roles for a tenant"""
         if not all(isinstance(role, TenantAccountJoinRole) for role in roles):
             raise ValueError('all roles must be TenantAccountJoinRole')
@@ -322,9 +344,9 @@ class TenantService:
     def check_member_permission(tenant: Tenant, operator: Account, member: Account, action: str) -> None:
         """Check member permission"""
         perms = {
-            'add': ['owner', 'admin'],
-            'remove': ['owner'],
-            'update': ['owner']
+            'add': [TenantAccountRole.OWNER, TenantAccountRole.ADMIN],
+            'remove': [TenantAccountRole.OWNER],
+            'update': [TenantAccountRole.OWNER]
         }
         if action not in ['add', 'remove', 'update']:
             raise InvalidActionError("Invalid action.")
@@ -352,12 +374,6 @@ class TenantService:
             raise MemberNotInTenantError("Member not in tenant.")
 
         db.session.delete(ta)
-
-        account.initialized_at = None
-        account.status = AccountStatus.PENDING.value
-        account.password = None
-        account.password_salt = None
-
         db.session.commit()
 
     @staticmethod
@@ -408,45 +424,51 @@ class RegisterService:
         return f'member_invite:token:{token}'
 
     @classmethod
-    def register(cls, email, name, password: str = None, open_id: str = None, provider: str = None) -> Account:
+    def register(cls, email, name, password: str = None, open_id: str = None, provider: str = None,
+                 language: str = None, status: AccountStatus = None) -> Account:
         db.session.begin_nested()
         """Register account"""
         try:
-            account = AccountService.create_account(email, name, interface_language=languages[0], password=password)
-            account.status = AccountStatus.ACTIVE.value
-            account.initialized_at = datetime.utcnow()
+            account = AccountService.create_account(
+                email=email,
+                name=name,
+                interface_language=language if language else languages[0],
+                password=password
+            )
+            account.status = AccountStatus.ACTIVE.value if not status else status.value
+            account.initialized_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
             if open_id is not None or provider is not None:
                 AccountService.link_account_integrate(provider, open_id, account)
+            if current_app.config['EDITION'] != 'SELF_HOSTED':
+                tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
 
-            tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
+                TenantService.create_tenant_member(tenant, account, role='owner')
+                account.current_tenant = tenant
 
-            TenantService.create_tenant_member(tenant, account, role='owner')
-            account.current_tenant = tenant
+                tenant_was_created.send(tenant)
 
             db.session.commit()
         except Exception as e:
-            db.session.rollback()  # todo: do not work
+            db.session.rollback()
             logging.error(f'Register failed: {e}')
             raise AccountRegisterError(f'Registration failed: {e}') from e
-
-        tenant_was_created.send(tenant)
 
         return account
 
     @classmethod
-    def invite_new_member(cls, tenant: Tenant, email: str, language: str, role: str = 'normal', inviter: Account = None) -> str:    
+    def invite_new_member(cls, tenant: Tenant, email: str, language: str, role: str = 'normal', inviter: Account = None) -> str:
         """Invite new member"""
         account = Account.query.filter_by(email=email).first()
 
         if not account:
             TenantService.check_member_permission(tenant, inviter, None, 'add')
             name = email.split('@')[0]
-            account = AccountService.create_account(email, name, interface_language=language)
-            account.status = AccountStatus.PENDING.value
-            db.session.commit()
 
+            account = cls.register(email=email, name=name, language=language, status=AccountStatus.PENDING)
+            # Create new tenant member for invited tenant
             TenantService.create_tenant_member(tenant, account, role)
+            TenantService.switch_tenant(account, tenant.id)
         else:
             TenantService.check_member_permission(tenant, inviter, account, 'add')
             ta = TenantAccountJoin.query.filter_by(
@@ -500,7 +522,7 @@ class RegisterService:
             redis_client.delete(cls._get_invitation_token_key(token))
 
     @classmethod
-    def get_invitation_if_token_valid(cls, workspace_id: str, email: str, token: str) -> Optional[Dict[str, Any]]:
+    def get_invitation_if_token_valid(cls, workspace_id: str, email: str, token: str) -> Optional[dict[str, Any]]:
         invitation_data = cls._get_invitation_by_token(token, workspace_id, email)
         if not invitation_data:
             return None
@@ -534,7 +556,7 @@ class RegisterService:
         }
 
     @classmethod
-    def _get_invitation_by_token(cls, token: str, workspace_id: str, email: str) -> Optional[Dict[str, str]]:
+    def _get_invitation_by_token(cls, token: str, workspace_id: str, email: str) -> Optional[dict[str, str]]:
         if workspace_id is not None and email is not None:
             email_hash = sha256(email.encode()).hexdigest()
             cache_key = f'member_invite_token:{workspace_id}, {email_hash}:{token}'

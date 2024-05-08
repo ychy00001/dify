@@ -40,7 +40,7 @@ import { changeLanguage } from '@/i18n/i18next-config'
 
 export const useChatWithHistory = (installedAppInfo?: InstalledApp) => {
   const isInstalledApp = useMemo(() => !!installedAppInfo, [installedAppInfo])
-  const { data: appInfo, isLoading: appInfoLoading } = useSWR(installedAppInfo ? null : 'appInfo', fetchAppInfo)
+  const { data: appInfo, isLoading: appInfoLoading, error: appInfoError } = useSWR(installedAppInfo ? null : 'appInfo', fetchAppInfo)
 
   const appData = useMemo(() => {
     if (isInstalledApp) {
@@ -157,7 +157,7 @@ export const useChatWithHistory = (installedAppInfo?: InstalledApp) => {
     handleNewConversationInputsChange(conversationInputs)
   }, [handleNewConversationInputsChange, inputsForms])
 
-  const { data: newConversation } = useSWR(newConversationId ? [isInstalledApp, appId, newConversationId] : null, () => generationConversationName(isInstalledApp, appId, newConversationId))
+  const { data: newConversation } = useSWR(newConversationId ? [isInstalledApp, appId, newConversationId] : null, () => generationConversationName(isInstalledApp, appId, newConversationId), { revalidateOnFocus: false })
   const [originConversationList, setOriginConversationList] = useState<ConversationItem[]>([])
   useEffect(() => {
     if (appConversationData?.data && !appConversationDataLoading)
@@ -350,6 +350,7 @@ export const useChatWithHistory = (installedAppInfo?: InstalledApp) => {
   }, [isInstalledApp, appId, t, notify])
 
   return {
+    appInfoError,
     appInfoLoading,
     isInstalledApp,
     appId,

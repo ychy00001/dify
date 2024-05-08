@@ -15,12 +15,15 @@ export const userInputsFormToPromptVariables = (useInputs: UserInputFormItem[] |
       if (item['text-input'])
         return ['string', item['text-input']]
 
-      if (item.external_data_tool)
-        return ['api', item.external_data_tool]
+      if (item.number)
+        return ['number', item.number]
 
-      return ['select', item.select]
+      if (item.external_data_tool)
+        return [item.external_data_tool.type, item.external_data_tool]
+
+      return ['select', item.select || {}]
     })()
-    const is_context_var = dataset_query_variable === content.variable
+    const is_context_var = dataset_query_variable === content?.variable
 
     if (type === 'string' || type === 'paragraph') {
       promptVariables.push({
@@ -33,7 +36,26 @@ export const userInputsFormToPromptVariables = (useInputs: UserInputFormItem[] |
         is_context_var,
       })
     }
-    else if (type === 'api') {
+    else if (type === 'number') {
+      promptVariables.push({
+        key: content.variable,
+        name: content.label,
+        required: content.required,
+        type,
+        options: [],
+      })
+    }
+    else if (type === 'select') {
+      promptVariables.push({
+        key: content.variable,
+        name: content.label,
+        required: content.required,
+        type: 'select',
+        options: content.options,
+        is_context_var,
+      })
+    }
+    else {
       promptVariables.push({
         key: content.variable,
         name: content.label,
@@ -43,16 +65,6 @@ export const userInputsFormToPromptVariables = (useInputs: UserInputFormItem[] |
         config: content.config,
         icon: content.icon,
         icon_background: content.icon_background,
-        is_context_var,
-      })
-    }
-    else {
-      promptVariables.push({
-        key: content.variable,
-        name: content.label,
-        required: content.required,
-        type: 'select',
-        options: content.options,
         is_context_var,
       })
     }
@@ -78,8 +90,30 @@ export const promptVariablesToUserInputsForm = (promptVariables: PromptVariable[
           default: '',
         },
       } as any)
+      return
     }
-    else if (item.type === 'api') {
+    if (item.type === 'number') {
+      userInputs.push({
+        number: {
+          label: item.name,
+          variable: item.key,
+          required: item.required !== false, // default true
+          default: '',
+        },
+      } as any)
+    }
+    else if (item.type === 'select') {
+      userInputs.push({
+        select: {
+          label: item.name,
+          variable: item.key,
+          required: item.required !== false, // default true
+          options: item.options,
+          default: '',
+        },
+      } as any)
+    }
+    else {
       userInputs.push({
         external_data_tool: {
           label: item.name,
@@ -93,17 +127,7 @@ export const promptVariablesToUserInputsForm = (promptVariables: PromptVariable[
         },
       } as any)
     }
-    else {
-      userInputs.push({
-        select: {
-          label: item.name,
-          variable: item.key,
-          required: item.required !== false, // default true
-          options: item.options,
-          default: '',
-        },
-      } as any)
-    }
   })
+
   return userInputs
 }

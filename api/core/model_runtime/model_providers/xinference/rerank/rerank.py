@@ -1,13 +1,20 @@
 from typing import Optional
 
+from xinference_client.client.restful.restful_client import Client, RESTfulRerankModelHandle
+
 from core.model_runtime.entities.common_entities import I18nObject
 from core.model_runtime.entities.model_entities import AIModelEntity, FetchFrom, ModelType
 from core.model_runtime.entities.rerank_entities import RerankDocument, RerankResult
-from core.model_runtime.errors.invoke import (InvokeAuthorizationError, InvokeBadRequestError, InvokeConnectionError,
-                                              InvokeError, InvokeRateLimitError, InvokeServerUnavailableError)
+from core.model_runtime.errors.invoke import (
+    InvokeAuthorizationError,
+    InvokeBadRequestError,
+    InvokeConnectionError,
+    InvokeError,
+    InvokeRateLimitError,
+    InvokeServerUnavailableError,
+)
 from core.model_runtime.errors.validate import CredentialsValidateFailedError
 from core.model_runtime.model_providers.__base.rerank_model import RerankModel
-from xinference_client.client.restful.restful_client import Client, RESTfulRerankModelHandle
 
 
 class XinferenceRerankModel(RerankModel):
@@ -37,17 +44,11 @@ class XinferenceRerankModel(RerankModel):
                 docs=[]
             )
 
-        # initialize client
-        client = Client(
-            base_url=credentials['server_url']
-        )
+        if credentials['server_url'].endswith('/'):
+            credentials['server_url'] = credentials['server_url'][:-1]
 
-        xinference_client = client.get_model(model_uid=credentials['model_uid'])
-
-        if not isinstance(xinference_client, RESTfulRerankModelHandle):
-            raise InvokeBadRequestError('please check model type, the model you want to invoke is not a rerank model')
-
-        response = xinference_client.rerank(
+        handle = RESTfulRerankModelHandle(credentials['model_uid'], credentials['server_url'],auth_headers={})
+        response = handle.rerank(
             documents=docs,
             query=query,
             top_n=top_n,
@@ -85,6 +86,23 @@ class XinferenceRerankModel(RerankModel):
         :return:
         """
         try:
+            if "/" in credentials['model_uid'] or "?" in credentials['model_uid'] or "#" in credentials['model_uid']:
+                raise CredentialsValidateFailedError("model_uid should not contain /, ?, or #")
+
+            if credentials['server_url'].endswith('/'):
+                credentials['server_url'] = credentials['server_url'][:-1]
+
+            # initialize client
+            client = Client(
+                base_url=credentials['server_url']
+            )
+
+            xinference_client = client.get_model(model_uid=credentials['model_uid'])
+
+            if not isinstance(xinference_client, RESTfulRerankModelHandle):
+                raise InvokeBadRequestError(
+                    'please check model type, the model you want to invoke is not a rerank model')
+            
             self.invoke(
                 model=model,
                 credentials=credentials,

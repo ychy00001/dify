@@ -1,14 +1,13 @@
-# -*- coding:utf-8 -*-
-import flask
 import flask_login
+from flask import current_app, request
+from flask_restful import Resource, reqparse
+
 import services
 from controllers.console import api
 from controllers.console.setup import setup_required
-from flask import current_app, request
-from flask_restful import Resource, reqparse
 from libs.helper import email
 from libs.password import valid_password
-from services.account_service import AccountService
+from services.account_service import AccountService, TenantService
 
 
 class LoginApi(Resource):
@@ -27,8 +26,13 @@ class LoginApi(Resource):
 
         try:
             account = AccountService.authenticate(args['email'], args['password'])
-        except services.errors.account.AccountLoginError:
-            return {'code': 'unauthorized', 'message': 'Invalid email or password'}, 401
+        except services.errors.account.AccountLoginError as e:
+            return {'code': 'unauthorized', 'message': str(e)}, 401
+
+        # SELF_HOSTED only have one workspace
+        tenants = TenantService.get_join_tenants(account)
+        if len(tenants) == 0:
+            return {'result': 'fail', 'data': 'workspace not found, please contact system admin to invite you to join in a workspace'}
 
         AccountService.update_last_login(account, request)
 
