@@ -20,10 +20,13 @@ parameters: # 参数列表
       en_US: used for generage image
       zh_Hans: 用于图片生成的关键词
     llm_description: key words for generage image # 传递给LLM的介绍，同上，为了使得LLM更好理解这个参数，我们建议在这里写上关于这个参数尽可能详细的信息，让LLM能够理解这个参数
+    description: key words for generage image # 传递给LLM的介绍，同上，为了使得LLM更好理解这个参数，我们建议在这里写上关于这个参数尽可能详细的信息，让LLM能够理解这个参数
     form: llm # 表单类型，llm表示这个参数需要由Agent自行推理出来，前端将不会展示这个参数
   - name: batch_size
     type: number # 参数类型
-    required: false
+    llm_description: used for generate the result image number, default 1
+    description: used for generate the result image number, default 1
+    required: true
     default: 1
     label:
       en_US: Result image number
@@ -37,6 +40,8 @@ parameters: # 参数列表
   - name: size
     type: select
     required: true
+    llm_description: used for generate the image size, default square
+    description: used for generate the image size, default square
     human_description:
       en_US: selecting the image size
       zh_Hans: 选择图像大小
@@ -66,6 +71,8 @@ parameters: # 参数列表
   - name: img_style
     type: select # 参数类型
     required: true
+    llm_description: used for generate the style for image, default muou_realistic
+    description: used for generate the style for image, default muou_realistic
     label:
       en_US: image style
       zh_Hans: 图片风格
